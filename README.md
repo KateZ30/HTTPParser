@@ -1,7 +1,10 @@
+**Note** This is a block based variant which uses a malloc/free for the parser
+object and the callbacks structure. Lame, I know.
+Do not use this unless you know what your are doin'! ;-)
+
+
 HTTP Parser
 ===========
-
-[![Build Status](https://travis-ci.org/joyent/http-parser.png?branch=master)](https://travis-ci.org/joyent/http-parser)
 
 This is a parser for HTTP messages written in C. It parses both requests and
 responses. The parser is designed to be used in performance HTTP
