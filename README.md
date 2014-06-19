@@ -8,7 +8,7 @@ HTTP Parser
 
 This is a parser for HTTP messages written in C. It parses both requests and
 responses. The parser is designed to be used in performance HTTP
-applications. It does not make any syscalls nor allocations, it does not
+applications. It does not make any syscalls ~~nor allocations~~, it does not
 buffer data, it can be interrupted at anytime. Depending on your
 architecture, it only requires about 40 bytes of data per message
 stream (in a web server that is per connection).
@@ -47,6 +47,10 @@ settings.on_header_field = my_header_field_callback;
 
 http_parser *parser = malloc(sizeof(http_parser));
 http_parser_init(parser, HTTP_REQUEST);
+
+http_parser_set_on_url = ^{ ... }
+http_parser_set_on_header_field = ^{ ... }
+
 parser->data = my_socket;
 ```
 
@@ -66,7 +70,7 @@ if (recved < 0) {
 /* Start up / continue the parser.
  * Note we pass recved==0 to signal that EOF has been received.
  */
-nparsed = http_parser_execute(parser, &settings, buf, recved);
+nparsed = http_parser_execute(parser, buf, recved);
 
 if (parser->upgrade) {
   /* handle new protocol */
@@ -131,9 +135,9 @@ save certain data for later usage, you can do that from the callbacks.
 
 There are two types of callbacks:
 
-* notification `typedef int (*http_cb) (http_parser*);`
+* notification `typedef int (^http_cb) (http_parser*);`
     Callbacks: on_message_begin, on_headers_complete, on_message_complete.
-* data `typedef int (*http_data_cb) (http_parser*, const char *at, size_t length);`
+* data `typedef int (^http_data_cb) (http_parser*, const char *at, size_t length);`
     Callbacks: (requests only) on_uri,
                (common) on_header_field, on_header_value, on_body;
 
