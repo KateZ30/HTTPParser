@@ -5,32 +5,69 @@
 //  Created by Helge Heß on 6/19/14.
 //  Copyright © 2014 Always Right Institute. All rights reserved.
 //
+/* Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
 
 public enum HTTPMethod : Int {
-  // Either inherit from Int (and have raw values) OR have cases with arguments
+  case DELETE = 0
   
-  case GET, HEAD, PUT, DELETE, POST, OPTIONS
-  
-  case PROPFIND, PROPPATCH, MKCOL
-  
-  case REPORT
-  
-  case MKCALENDAR
-  
-  case BATCH // ;-)
-  
-  case CONNECT, TRACE
-  case COPY, MOVE
-  case LOCK, UNLOCK
+  case GET
+  case HEAD
+  case POST
+  case PUT
+  /* pathological */
+  case CONNECT
+  case OPTIONS
+  case TRACE
+  /* WebDAV */
+  case COPY
+  case LOCK
+  case MKCOL
+  case MOVE
+  case PROPFIND
+  case PROPPATCH
   case SEARCH
-  
-  case MKACTIVITY, CHECKOUT, MERGE
-  case MSEARCH, NOTIFY, SUBSCRIBE, UNSUBSCRIBE
-  
-  case PATCH, PURGE
-  
-  case ACL, BIND, UNBIND, REBIND
-  case LINK, UNLINK
+  case UNLOCK
+  case BIND
+  case REBIND
+  case UNBIND
+  case ACL
+  /* subversion */
+  case REPORT
+  case MKACTIVITY
+  case CHECKOUT
+  case MERGE
+  /* upnp */
+  case MSEARCH
+  case NOTIFY
+  case SUBSCRIBE
+  case UNSUBSCRIBE
+  /* RFC-5789 */
+  case PATCH
+  case PURGE
+  /* CalDAV */
+  case MKCALENDAR
+  /* RFC-2068, section 19.6.1.2 */ 
+  case LINK
+  case UNLINK
   
 
   public init?(string: String) {
@@ -49,8 +86,6 @@ public enum HTTPMethod : Int {
       case "REPORT":      self = .REPORT
       
       case "MKCALENDAR":  self = .MKCALENDAR
-      
-      case "BATCH":       self = .BATCH
       
       case "CONNECT":     self = .CONNECT
       case "TRACE":       self = .TRACE
@@ -106,8 +141,6 @@ public extension HTTPMethod {
       case .REPORT:     return "REPORT"
         
       case .MKCALENDAR: return "MKCALENDAR"
-        
-      case .BATCH:      return "BATCH"
 
       case .CONNECT:    return "CONNECT"
       case .TRACE:      return "TRACE"
@@ -147,8 +180,6 @@ public extension HTTPMethod {
         return true
       case .PROPFIND, .REPORT:
         return true
-      case .BATCH:
-        return true
       default:
         return false
     }
@@ -161,8 +192,6 @@ public extension HTTPMethod {
       case .PROPFIND, .REPORT, .PROPPATCH:
         return true
       case .MKCOL, .MKCALENDAR:
-        return true
-      case .BATCH:
         return true
       default:
         return false
