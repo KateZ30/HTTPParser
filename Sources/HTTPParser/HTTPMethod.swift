@@ -6,14 +6,14 @@
 //  Copyright © 2014 Always Right Institute. All rights reserved.
 //
 
-public enum HTTPMethod : Equatable {
+public enum HTTPMethod : Int {
   // Either inherit from Int (and have raw values) OR have cases with arguments
   
   case GET, HEAD, PUT, DELETE, POST, OPTIONS
   
   case PROPFIND, PROPPATCH, MKCOL
   
-  case REPORT((String?, String?)) // tuple: ns, tag
+  case REPORT
   
   case MKCALENDAR
   
@@ -32,10 +32,8 @@ public enum HTTPMethod : Equatable {
   case ACL, BIND, UNBIND, REBIND
   case LINK, UNLINK
   
-  case Extension(String)
 
-
-  public init(string: String) {
+  public init?(string: String) {
     switch string {
       case "GET":         self = .GET
       case "HEAD":        self = .HEAD
@@ -48,7 +46,7 @@ public enum HTTPMethod : Equatable {
       case "PROPPATCH":   self = .PROPPATCH
       case "MKCOL":       self = .MKCOL
       
-      case "REPORT":      self = .REPORT( ( nil, nil ) )
+      case "REPORT":      self = .REPORT
       
       case "MKCALENDAR":  self = .MKCALENDAR
       
@@ -84,7 +82,7 @@ public enum HTTPMethod : Equatable {
       case "LINK":        self = .LINK
       case "UNLINK":      self = .UNLINK
       
-      default:            self = .Extension(string)
+      default: return nil
     }
   }
   
@@ -140,9 +138,6 @@ public extension HTTPMethod {
       
       case .LINK:       return "LINK"
       case .UNLINK:     return "UNLINK"
-      
-      case .Extension(let v):
-        return v
     }
   }
   
@@ -154,8 +149,6 @@ public extension HTTPMethod {
         return true
       case .BATCH:
         return true
-      case .Extension:
-        return nil // don't know
       default:
         return false
     }
@@ -171,8 +164,6 @@ public extension HTTPMethod {
         return true
       case .BATCH:
         return true
-      case .Extension:
-        return nil // don't know
       default:
         return false
     }
@@ -182,37 +173,8 @@ public extension HTTPMethod {
 extension HTTPMethod : CustomStringConvertible {
   
   public var description: String {
-    switch self {
-      case .REPORT(let ns, let tag):
-        return "REPORT[{\(ns)}\(tag)]"
-      
-      default:
-        return method
-    }
+    return method
   }
-}
-
-extension HTTPMethod: StringLiteralConvertible {
-  // this allows you to do: let addr : in_addr = "192.168.0.1"
-  
-  public init(stringLiteral value: StringLiteralType) {
-    self.init(string: value)
-  }
-  
-  public init(extendedGraphemeClusterLiteral v: ExtendedGraphemeClusterType) {
-    self.init(string: v)
-  }
-  
-  public init(unicodeScalarLiteral v: String) {
-    // FIXME: doesn't work with UnicodeScalarLiteralType?
-    self.init(string: v)
-  }
-}
-
-public func ==(lhs: HTTPMethod, rhs: HTTPMethod) -> Bool {
-  // TBD: This is a bit lame, but is there a way to do this w/o spelling out all
-  //      values in a big switch?
-  return lhs.description == rhs.description
 }
 
 
