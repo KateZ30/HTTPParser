@@ -8,6 +8,9 @@
 
 // Not in Swift: let c : CChar = 'A'
 
+let cSPACE : CChar = 32
+let cDASH  : CChar = 45
+
 let cA : CChar = 65
 let cB : CChar = 66
 let cC : CChar = 67

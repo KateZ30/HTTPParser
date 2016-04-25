@@ -76,7 +76,7 @@ public class HTTPParser {
   var flags          = HTTPParserOptions()
   var state          : ParserState       = .s_dead
   var header_state   : ParserHeaderState = .h_general
-  var index          : UInt8 = 0
+  var index          : Int   = 0 // this is UInt8, but Int can be used as an idx
   
   var nread          : Int   = 0
   var content_length : Int   = 0
@@ -85,7 +85,7 @@ public class HTTPParser {
   var http_major     : Int16?      = nil
   var http_minor     : Int16?      = nil
   var status_code    : Int16?      = nil // responses only
-  var method         : HTTPMethod? = nil // requests only
+  var method         : HTTPMethod! = nil // requests only
   var error          : HTTPError   = .OK // use an optional for OK?
 
   var statusCode : HTTPStatus? {
@@ -508,7 +508,7 @@ public class HTTPParser {
             case cP: self.method = .POST
               /* or PROPFIND|PROPPATCH|PUT|PATCH|PURGE */
 
-            case cR: self.method = .REPORT((nil, nil)) /* or REBIND */
+            case cR: self.method = .REPORT /* or REBIND */
             case cS: self.method = .SUBSCRIBE /* or SEARCH */
             case cT: self.method = .TRACE
             case cU: self.method = .UNLOCK
@@ -524,118 +524,105 @@ public class HTTPParser {
           
           break;
 
-        /*
-      case s_req_method:
-      {
-        const char *matcher;
-        if (UNLIKELY(ch == '\0')) {
-          SET_ERRNO(HPE_INVALID_METHOD);
-          goto error;
-        }
-
-        matcher = method_strings[parser->method];
-        if (ch == ' ' && matcher[parser->index] == '\0') {
-          UPDATE_STATE(s_req_spaces_before_url);
-        } else if (ch == matcher[parser->index]) {
-          ; /* nada */
-        } else if (parser->method == HTTP_CONNECT) {
-          if (parser->index == 1 && ch == 'H') {
-            parser->method = HTTP_CHECKOUT;
-          } else if (parser->index == 2  && ch == 'P') {
-            parser->method = HTTP_COPY;
+      case .s_req_method:
+        guard ch != 0 else { return gotoError(.INVALID_METHOD) }
+        
+        //const char *matcher = method_strings[self.method];
+        let matcher = self.method.csMethod
+        
+        
+        if (ch == cSPACE && matcher[self.index] == 0) {
+          UPDATE_STATE(.s_req_spaces_before_url);
+        } else if (ch == matcher[self.index]) {
+          /* nada */
+        } else if (self.method == .CONNECT) {
+          if (self.index == 1 && ch == cH) {
+            self.method = .CHECKOUT;
+          } else if (self.index == 2  && ch == cP) {
+            self.method = .COPY;
           } else {
-            SET_ERRNO(HPE_INVALID_METHOD);
-            goto error;
+            return gotoError(.INVALID_METHOD)
           }
-        } else if (parser->method == HTTP_MKCOL) {
-          if (parser->index == 1 && ch == 'O') {
-            parser->method = HTTP_MOVE;
-          } else if (parser->index == 1 && ch == 'E') {
-            parser->method = HTTP_MERGE;
-          } else if (parser->index == 1 && ch == '-') {
-            parser->method = HTTP_MSEARCH;
-          } else if (parser->index == 2 && ch == 'A') {
-            parser->method = HTTP_MKACTIVITY;
-          } else if (parser->index == 3 && ch == 'A') {
-            parser->method = HTTP_MKCALENDAR;
+        } else if (self.method == .MKCOL) {
+          if (self.index == 1 && ch == cO) {
+            self.method = .MOVE;
+          } else if (self.index == 1 && ch == cE) {
+            self.method = .MERGE;
+          } else if (self.index == 1 && ch == cDASH) {
+            self.method = .MSEARCH;
+          } else if (self.index == 2 && ch == cA) {
+            self.method = .MKACTIVITY;
+          } else if (self.index == 3 && ch == cA) {
+            self.method = .MKCALENDAR;
           } else {
-            SET_ERRNO(HPE_INVALID_METHOD);
-            goto error;
+            return gotoError(.INVALID_METHOD)
           }
-        } else if (parser->method == HTTP_SUBSCRIBE) {
-          if (parser->index == 1 && ch == 'E') {
-            parser->method = HTTP_SEARCH;
+        } else if (self.method == .SUBSCRIBE) {
+          if (self.index == 1 && ch == cE) {
+            self.method = .SEARCH;
           } else {
-            SET_ERRNO(HPE_INVALID_METHOD);
-            goto error;
+            return gotoError(.INVALID_METHOD)
           }
-        } else if (parser->method == HTTP_REPORT) {
-            if (parser->index == 2 && ch == 'B') {
-              parser->method = HTTP_REBIND;
+        } else if (self.method == .REPORT) {
+            if (self.index == 2 && ch == cB) {
+              self.method = .REBIND;
             } else {
-              SET_ERRNO(HPE_INVALID_METHOD);
-              goto error;
+              return gotoError(.INVALID_METHOD)
             }
-        } else if (parser->index == 1) {
-          if (parser->method == HTTP_POST) {
-            if (ch == 'R') {
-              parser->method = HTTP_PROPFIND; /* or HTTP_PROPPATCH */
-            } else if (ch == 'U') {
-              parser->method = HTTP_PUT; /* or HTTP_PURGE */
-            } else if (ch == 'A') {
-              parser->method = HTTP_PATCH;
+        } else if (self.index == 1) {
+          if (self.method == .POST) {
+            if (ch == cR) {
+              self.method = .PROPFIND; /* or HTTP_PROPPATCH */
+            } else if (ch == cU) {
+              self.method = .PUT; /* or HTTP_PURGE */
+            } else if (ch == cA) {
+              self.method = .PATCH;
             } else {
-              SET_ERRNO(HPE_INVALID_METHOD);
-              goto error;
+              return gotoError(.INVALID_METHOD)
             }
-          } else if (parser->method == HTTP_LOCK) {
-            if (ch == 'I') {
-              parser->method = HTTP_LINK;
+          } else if (self.method == .LOCK) {
+            if (ch == cI) {
+              self.method = .LINK;
             } else {
-              SET_ERRNO(HPE_INVALID_METHOD);
-              goto error;
+              return gotoError(.INVALID_METHOD)
             }
           }
-        } else if (parser->index == 2) {
-          if (parser->method == HTTP_PUT) {
-            if (ch == 'R') {
-              parser->method = HTTP_PURGE;
+        } else if (self.index == 2) {
+          if (self.method == .PUT) {
+            if (ch == cR) {
+              self.method = .PURGE;
             } else {
-              SET_ERRNO(HPE_INVALID_METHOD);
-              goto error;
+              return gotoError(.INVALID_METHOD)
             }
-          } else if (parser->method == HTTP_UNLOCK) {
-            if (ch == 'S') {
-              parser->method = HTTP_UNSUBSCRIBE;
-            } else if(ch == 'B') {
-              parser->method = HTTP_UNBIND;
+          } else if (self.method == .UNLOCK) {
+            if (ch == cS) {
+              self.method = .UNSUBSCRIBE;
+            } else if(ch == cB) {
+              self.method = .UNBIND;
             } else {
-              SET_ERRNO(HPE_INVALID_METHOD);
-              goto error;
+              return gotoError(.INVALID_METHOD)
             }
           } else {
-            SET_ERRNO(HPE_INVALID_METHOD);
-            goto error;
+            return gotoError(.INVALID_METHOD)
           }
-        } else if (parser->index == 4 && parser->method == HTTP_PROPFIND && ch == 'P') {
-          parser->method = HTTP_PROPPATCH;
-        } else if (parser->index == 3 && parser->method == HTTP_UNLOCK && ch == 'I') {
-          parser->method = HTTP_UNLINK;
+        } else if (self.index == 4 && self.method == .PROPFIND && ch == cP) {
+          self.method = .PROPPATCH;
+        } else if (self.index == 3 && self.method == .UNLOCK && ch == cI) {
+          self.method = .UNLINK;
         } else {
-          SET_ERRNO(HPE_INVALID_METHOD);
-          goto error;
+          return gotoError(.INVALID_METHOD)
         }
 
-        ++parser->index;
-        break;
-      }
+        self.index += 1
+
+        /*
 
       case s_req_spaces_before_url:
       {
         if (ch == ' ') break;
 
         MARK(url);
-        if (parser->method == HTTP_CONNECT) {
+        if (self.method == .CONNECT) {
           UPDATE_STATE(s_req_server_start);
         }
 
@@ -848,7 +835,7 @@ public class HTTPParser {
 
         MARK(header_field);
 
-        parser->index = 0;
+        self.index = 0;
         UPDATE_STATE(s_header_field);
 
         switch (c) {
@@ -890,17 +877,17 @@ public class HTTPParser {
               break;
 
             case h_C:
-              parser->index++;
+              self.index++;
               parser->header_state = (c == 'o' ? h_CO : h_general);
               break;
 
             case h_CO:
-              parser->index++;
+              self.index++;
               parser->header_state = (c == 'n' ? h_CON : h_general);
               break;
 
             case h_CON:
-              parser->index++;
+              self.index++;
               switch (c) {
                 case 'n':
                   parser->header_state = h_matching_connection;
@@ -917,11 +904,11 @@ public class HTTPParser {
             /* connection */
 
             case h_matching_connection:
-              parser->index++;
-              if (parser->index > sizeof(CONNECTION)-1
-                  || c != CONNECTION[parser->index]) {
+              self.index++;
+              if (self.index > sizeof(CONNECTION)-1
+                  || c != CONNECTION[self.index]) {
                 parser->header_state = h_general;
-              } else if (parser->index == sizeof(CONNECTION)-2) {
+              } else if (self.index == sizeof(CONNECTION)-2) {
                 parser->header_state = h_connection;
               }
               break;
@@ -929,11 +916,11 @@ public class HTTPParser {
             /* proxy-connection */
 
             case h_matching_proxy_connection:
-              parser->index++;
-              if (parser->index > sizeof(PROXY_CONNECTION)-1
-                  || c != PROXY_CONNECTION[parser->index]) {
+              self.index++;
+              if (self.index > sizeof(PROXY_CONNECTION)-1
+                  || c != PROXY_CONNECTION[self.index]) {
                 parser->header_state = h_general;
-              } else if (parser->index == sizeof(PROXY_CONNECTION)-2) {
+              } else if (self.index == sizeof(PROXY_CONNECTION)-2) {
                 parser->header_state = h_connection;
               }
               break;
@@ -941,11 +928,11 @@ public class HTTPParser {
             /* content-length */
 
             case h_matching_content_length:
-              parser->index++;
-              if (parser->index > sizeof(CONTENT_LENGTH)-1
-                  || c != CONTENT_LENGTH[parser->index]) {
+              self.index++;
+              if (self.index > sizeof(CONTENT_LENGTH)-1
+                  || c != CONTENT_LENGTH[self.index]) {
                 parser->header_state = h_general;
-              } else if (parser->index == sizeof(CONTENT_LENGTH)-2) {
+              } else if (self.index == sizeof(CONTENT_LENGTH)-2) {
                 parser->header_state = h_content_length;
               }
               break;
@@ -953,11 +940,11 @@ public class HTTPParser {
             /* transfer-encoding */
 
             case h_matching_transfer_encoding:
-              parser->index++;
-              if (parser->index > sizeof(TRANSFER_ENCODING)-1
-                  || c != TRANSFER_ENCODING[parser->index]) {
+              self.index++;
+              if (self.index > sizeof(TRANSFER_ENCODING)-1
+                  || c != TRANSFER_ENCODING[self.index]) {
                 parser->header_state = h_general;
-              } else if (parser->index == sizeof(TRANSFER_ENCODING)-2) {
+              } else if (self.index == sizeof(TRANSFER_ENCODING)-2) {
                 parser->header_state = h_transfer_encoding;
               }
               break;
@@ -965,11 +952,11 @@ public class HTTPParser {
             /* upgrade */
 
             case h_matching_upgrade:
-              parser->index++;
-              if (parser->index > sizeof(UPGRADE)-1
-                  || c != UPGRADE[parser->index]) {
+              self.index++;
+              if (self.index > sizeof(UPGRADE)-1
+                  || c != UPGRADE[self.index]) {
                 parser->header_state = h_general;
-              } else if (parser->index == sizeof(UPGRADE)-2) {
+              } else if (self.index == sizeof(UPGRADE)-2) {
                 parser->header_state = h_upgrade;
               }
               break;
@@ -1024,7 +1011,7 @@ public class HTTPParser {
         MARK(header_value);
 
         UPDATE_STATE(s_header_value);
-        parser->index = 0;
+        self.index = 0;
 
         c = LOWER(ch);
 
@@ -1160,11 +1147,11 @@ public class HTTPParser {
 
             /* Transfer-Encoding: chunked */
             case h_matching_transfer_encoding_chunked:
-              parser->index++;
-              if (parser->index > sizeof(CHUNKED)-1
-                  || c != CHUNKED[parser->index]) {
+              self.index++;
+              if (self.index > sizeof(CHUNKED)-1
+                  || c != CHUNKED[self.index]) {
                 h_state = h_general;
-              } else if (parser->index == sizeof(CHUNKED)-2) {
+              } else if (self.index == sizeof(CHUNKED)-2) {
                 h_state = h_transfer_encoding_chunked;
               }
               break;
@@ -1189,32 +1176,32 @@ public class HTTPParser {
 
             /* looking for 'Connection: keep-alive' */
             case h_matching_connection_keep_alive:
-              parser->index++;
-              if (parser->index > sizeof(KEEP_ALIVE)-1
-                  || c != KEEP_ALIVE[parser->index]) {
+              self.index++;
+              if (self.index > sizeof(KEEP_ALIVE)-1
+                  || c != KEEP_ALIVE[self.index]) {
                 h_state = h_matching_connection_token;
-              } else if (parser->index == sizeof(KEEP_ALIVE)-2) {
+              } else if (self.index == sizeof(KEEP_ALIVE)-2) {
                 h_state = h_connection_keep_alive;
               }
               break;
 
             /* looking for 'Connection: close' */
             case h_matching_connection_close:
-              parser->index++;
-              if (parser->index > sizeof(CLOSE)-1 || c != CLOSE[parser->index]) {
+              self.index++;
+              if (self.index > sizeof(CLOSE)-1 || c != CLOSE[self.index]) {
                 h_state = h_matching_connection_token;
-              } else if (parser->index == sizeof(CLOSE)-2) {
+              } else if (self.index == sizeof(CLOSE)-2) {
                 h_state = h_connection_close;
               }
               break;
 
             /* looking for 'Connection: upgrade' */
             case h_matching_connection_upgrade:
-              parser->index++;
-              if (parser->index > sizeof(UPGRADE) - 1 ||
-                  c != UPGRADE[parser->index]) {
+              self.index++;
+              if (self.index > sizeof(UPGRADE) - 1 ||
+                  c != UPGRADE[self.index]) {
                 h_state = h_matching_connection_token;
-              } else if (parser->index == sizeof(UPGRADE)-2) {
+              } else if (self.index == sizeof(UPGRADE)-2) {
                 h_state = h_connection_upgrade;
               }
               break;
@@ -1222,7 +1209,7 @@ public class HTTPParser {
             case h_matching_connection_token:
               if (ch == ',') {
                 h_state = h_matching_connection_token_start;
-                parser->index = 0;
+                self.index = 0;
               }
               break;
 
@@ -1242,7 +1229,7 @@ public class HTTPParser {
                   parser->flags |= F_CONNECTION_UPGRADE;
                 }
                 h_state = h_matching_connection_token_start;
-                parser->index = 0;
+                self.index = 0;
               } else if (ch != ' ') {
                 h_state = h_matching_connection_token;
               }
@@ -1355,7 +1342,7 @@ public class HTTPParser {
         parser->upgrade =
           ((parser->flags & (F_UPGRADE | F_CONNECTION_UPGRADE)) ==
            (F_UPGRADE | F_CONNECTION_UPGRADE) ||
-           parser->method == HTTP_CONNECT);
+           self.method == .CONNECT);
 
         /* Here we call the headers_complete callback. This is somewhat
          * different than other callbacks because if the user returns 1, we
@@ -1397,7 +1384,7 @@ public class HTTPParser {
 
         hasBody = parser->flags & F_CHUNKED ||
           (parser->content_length > 0 && parser->content_length != ULLONG_MAX);
-        if (parser->upgrade && (parser->method == HTTP_CONNECT ||
+        if (parser->upgrade && (self.method == .CONNECT ||
                                 (parser->flags & F_SKIPBODY) || !hasBody)) {
           /* Exit, the rest of the message is in a different protocol. */
           UPDATE_STATE(NEW_MESSAGE());
