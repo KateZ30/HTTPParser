@@ -16,6 +16,7 @@
 		E804482B1CCE4F6500447204 /* HTTPParserURLFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448251CCE4F6500447204 /* HTTPParserURLFields.swift */; };
 		E804482C1CCE4F6500447204 /* HTTPStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448261CCE4F6500447204 /* HTTPStatus.swift */; };
 		E80448481CCE5D1500447204 /* ascii.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448471CCE5D1500447204 /* ascii.swift */; };
+		E8921F891CCEA2B400E8611B /* URLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8921F881CCEA2B400E8611B /* URLParser.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,6 +57,7 @@
 		E80448451CCE55A900447204 /* http_parser.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = http_parser.c; sourceTree = "<group>"; };
 		E80448461CCE55A900447204 /* http_parser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = http_parser.h; sourceTree = "<group>"; };
 		E80448471CCE5D1500447204 /* ascii.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ascii.swift; path = Sources/HTTPParser/ascii.swift; sourceTree = SOURCE_ROOT; };
+		E8921F881CCEA2B400E8611B /* URLParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = URLParser.swift; path = Sources/HTTPParser/URLParser.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -109,6 +111,7 @@
 				E80448241CCE4F6500447204 /* HTTPParserURL.swift */,
 				E80448251CCE4F6500447204 /* HTTPParserURLFields.swift */,
 				E80448261CCE4F6500447204 /* HTTPStatus.swift */,
+				E8921F881CCEA2B400E8611B /* URLParser.swift */,
 				E80448471CCE5D1500447204 /* ascii.swift */,
 				E804480A1CCE4ECD00447204 /* Info.plist */,
 			);
@@ -259,6 +262,7 @@
 			files = (
 				E804482B1CCE4F6500447204 /* HTTPParserURLFields.swift in Sources */,
 				E80448281CCE4F6500447204 /* HTTPMethod.swift in Sources */,
+				E8921F891CCEA2B400E8611B /* URLParser.swift in Sources */,
 				E80448271CCE4F6500447204 /* HTTPError.swift in Sources */,
 				E804482A1CCE4F6500447204 /* HTTPParserURL.swift in Sources */,
 				E80448291CCE4F6500447204 /* HTTPParser.swift in Sources */,

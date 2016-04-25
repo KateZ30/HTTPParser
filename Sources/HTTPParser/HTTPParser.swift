@@ -524,117 +524,110 @@ public class HTTPParser {
           
           break;
 
-      case .s_req_method:
-        guard ch != 0 else { return gotoError(.INVALID_METHOD) }
-        
-        //const char *matcher = method_strings[self.method];
-        let matcher = self.method.csMethod
-        
-        
-        if (ch == cSPACE && matcher[self.index] == 0) {
-          UPDATE_STATE(.s_req_spaces_before_url);
-        } else if (ch == matcher[self.index]) {
-          /* nada */
-        } else if (self.method == .CONNECT) {
-          if (self.index == 1 && ch == cH) {
-            self.method = .CHECKOUT;
-          } else if (self.index == 2  && ch == cP) {
-            self.method = .COPY;
+        case .s_req_method:
+          guard ch != 0 else { return gotoError(.INVALID_METHOD) }
+          
+          //const char *matcher = method_strings[self.method];
+          let matcher = self.method.csMethod
+          
+          
+          if (ch == cSPACE && matcher[self.index] == 0) {
+            UPDATE_STATE(.s_req_spaces_before_url);
+          } else if (ch == matcher[self.index]) {
+            /* nada */
+          } else if (self.method == .CONNECT) {
+            if (self.index == 1 && ch == cH) {
+              self.method = .CHECKOUT;
+            } else if (self.index == 2  && ch == cP) {
+              self.method = .COPY;
+            } else {
+              return gotoError(.INVALID_METHOD)
+            }
+          } else if (self.method == .MKCOL) {
+            if (self.index == 1 && ch == cO) {
+              self.method = .MOVE;
+            } else if (self.index == 1 && ch == cE) {
+              self.method = .MERGE;
+            } else if (self.index == 1 && ch == cDASH) {
+              self.method = .MSEARCH;
+            } else if (self.index == 2 && ch == cA) {
+              self.method = .MKACTIVITY;
+            } else if (self.index == 3 && ch == cA) {
+              self.method = .MKCALENDAR;
+            } else {
+              return gotoError(.INVALID_METHOD)
+            }
+          } else if (self.method == .SUBSCRIBE) {
+            if (self.index == 1 && ch == cE) {
+              self.method = .SEARCH;
+            } else {
+              return gotoError(.INVALID_METHOD)
+            }
+          } else if (self.method == .REPORT) {
+              if (self.index == 2 && ch == cB) {
+                self.method = .REBIND;
+              } else {
+                return gotoError(.INVALID_METHOD)
+              }
+          } else if (self.index == 1) {
+            if (self.method == .POST) {
+              if (ch == cR) {
+                self.method = .PROPFIND; /* or HTTP_PROPPATCH */
+              } else if (ch == cU) {
+                self.method = .PUT; /* or HTTP_PURGE */
+              } else if (ch == cA) {
+                self.method = .PATCH;
+              } else {
+                return gotoError(.INVALID_METHOD)
+              }
+            } else if (self.method == .LOCK) {
+              if (ch == cI) {
+                self.method = .LINK;
+              } else {
+                return gotoError(.INVALID_METHOD)
+              }
+            }
+          } else if (self.index == 2) {
+            if (self.method == .PUT) {
+              if (ch == cR) {
+                self.method = .PURGE;
+              } else {
+                return gotoError(.INVALID_METHOD)
+              }
+            } else if (self.method == .UNLOCK) {
+              if (ch == cS) {
+                self.method = .UNSUBSCRIBE;
+              } else if(ch == cB) {
+                self.method = .UNBIND;
+              } else {
+                return gotoError(.INVALID_METHOD)
+              }
+            } else {
+              return gotoError(.INVALID_METHOD)
+            }
+          } else if (self.index == 4 && self.method == .PROPFIND && ch == cP) {
+            self.method = .PROPPATCH;
+          } else if (self.index == 3 && self.method == .UNLOCK && ch == cI) {
+            self.method = .UNLINK;
           } else {
             return gotoError(.INVALID_METHOD)
           }
-        } else if (self.method == .MKCOL) {
-          if (self.index == 1 && ch == cO) {
-            self.method = .MOVE;
-          } else if (self.index == 1 && ch == cE) {
-            self.method = .MERGE;
-          } else if (self.index == 1 && ch == cDASH) {
-            self.method = .MSEARCH;
-          } else if (self.index == 2 && ch == cA) {
-            self.method = .MKACTIVITY;
-          } else if (self.index == 3 && ch == cA) {
-            self.method = .MKCALENDAR;
-          } else {
-            return gotoError(.INVALID_METHOD)
-          }
-        } else if (self.method == .SUBSCRIBE) {
-          if (self.index == 1 && ch == cE) {
-            self.method = .SEARCH;
-          } else {
-            return gotoError(.INVALID_METHOD)
-          }
-        } else if (self.method == .REPORT) {
-            if (self.index == 2 && ch == cB) {
-              self.method = .REBIND;
-            } else {
-              return gotoError(.INVALID_METHOD)
-            }
-        } else if (self.index == 1) {
-          if (self.method == .POST) {
-            if (ch == cR) {
-              self.method = .PROPFIND; /* or HTTP_PROPPATCH */
-            } else if (ch == cU) {
-              self.method = .PUT; /* or HTTP_PURGE */
-            } else if (ch == cA) {
-              self.method = .PATCH;
-            } else {
-              return gotoError(.INVALID_METHOD)
-            }
-          } else if (self.method == .LOCK) {
-            if (ch == cI) {
-              self.method = .LINK;
-            } else {
-              return gotoError(.INVALID_METHOD)
-            }
-          }
-        } else if (self.index == 2) {
-          if (self.method == .PUT) {
-            if (ch == cR) {
-              self.method = .PURGE;
-            } else {
-              return gotoError(.INVALID_METHOD)
-            }
-          } else if (self.method == .UNLOCK) {
-            if (ch == cS) {
-              self.method = .UNSUBSCRIBE;
-            } else if(ch == cB) {
-              self.method = .UNBIND;
-            } else {
-              return gotoError(.INVALID_METHOD)
-            }
-          } else {
-            return gotoError(.INVALID_METHOD)
-          }
-        } else if (self.index == 4 && self.method == .PROPFIND && ch == cP) {
-          self.method = .PROPPATCH;
-        } else if (self.index == 3 && self.method == .UNLOCK && ch == cI) {
-          self.method = .UNLINK;
-        } else {
-          return gotoError(.INVALID_METHOD)
-        }
 
-        self.index += 1
+          self.index += 1
+
+        case .s_req_spaces_before_url:
+          if ch == cSPACE { break }
+          
+          if url_mark == nil { url_mark = p } // MARK(url)
+          if (self.method == .CONNECT) {
+            UPDATE_STATE(.s_req_server_start);
+          }
+          
+          UPDATE_STATE(parse_url_char(CURRENT_STATE, ch))
+          if (CURRENT_STATE == .s_dead) { return gotoError(.INVALID_URL) }
+
 
         /*
-
-      case s_req_spaces_before_url:
-      {
-        if (ch == ' ') break;
-
-        MARK(url);
-        if (self.method == .CONNECT) {
-          UPDATE_STATE(s_req_server_start);
-        }
-
-        UPDATE_STATE(parse_url_char(CURRENT_STATE(), ch));
-        if (UNLIKELY(CURRENT_STATE() == s_dead)) {
-          SET_ERRNO(HPE_INVALID_URL);
-          goto error;
-        }
-
-        break;
-      }
-
       case s_req_schema:
       case s_req_schema_slash:
       case s_req_schema_slash_slash:
