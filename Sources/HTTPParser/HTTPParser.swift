@@ -300,7 +300,9 @@ public class HTTPParser {
     }
     
     var ch : CChar
-    
+
+    // REEXECUTE macro:
+    //   if let len = gotoReexecute() { return len } // error?
     func gotoReexecute() -> size_t? {
       /* reexecute: label */
       
@@ -745,185 +747,148 @@ public class HTTPParser {
           guard ch == LF else { return gotoError(.LF_EXPECTED) }
           UPDATE_STATE(.s_header_field_start);
 
-        /*
-      case s_header_field_start:
-      {
-        if (ch == CR) {
-          UPDATE_STATE(s_headers_almost_done);
-          break;
-        }
+        case .s_header_field_start:
+          if ch == CR { UPDATE_STATE(.s_headers_almost_done); break }
 
-        if (ch == LF) {
-          /* they might be just sending \n instead of \r\n so this would be
-           * the second \n to denote the end of headers*/
-          UPDATE_STATE(s_headers_almost_done);
-          REEXECUTE();
-        }
+          if ch == LF {
+            /* they might be just sending \n instead of \r\n so this would be
+             * the second \n to denote the end of headers*/
+            UPDATE_STATE(.s_headers_almost_done)
+            if let len = gotoReexecute() { return len } // error?
+          }
 
-        c = TOKEN(ch);
+          let c = TOKEN(ch)
+          guard c != 0 else { return gotoError(.INVALID_HEADER_TOKEN) }
 
-        if (UNLIKELY(!c)) {
-          SET_ERRNO(HPE_INVALID_HEADER_TOKEN);
-          goto error;
-        }
 
-        MARK(header_field);
+          // MARK(header_field);
+          if header_field_mark == nil { header_field_mark = p }
 
-        self.index = 0;
-        UPDATE_STATE(s_header_field);
+          self.index = 0;
+          UPDATE_STATE(.s_header_field)
 
-        switch (c) {
-          case 'c':
-            parser->header_state = h_C;
-            break;
+          switch c {
+            case cc: self.header_state = .h_C
+            case cp: self.header_state = .h_matching_proxy_connection
+            case ct: self.header_state = .h_matching_transfer_encoding
+            case cu: self.header_state = .h_matching_upgrade
+            default: self.header_state = .h_general
+          }
 
-          case 'p':
-            parser->header_state = h_matching_proxy_connection;
-            break;
+      case .s_header_field:
+        let start = p
+        while p != (data + len) {
+          ch = p.memory
+          let c = TOKEN(ch)
+          if c == 0 { break }
 
-          case 't':
-            parser->header_state = h_matching_transfer_encoding;
-            break;
+          switch self.header_state {
+            case .h_general: break
 
-          case 'u':
-            parser->header_state = h_matching_upgrade;
-            break;
+            case .h_C:
+              self.index += 1
+              self.header_state = (c == co ? .h_CO : .h_general)
 
-          default:
-            parser->header_state = h_general;
-            break;
-        }
-        break;
-      }
+            case .h_CO:
+              self.index += 1
+              self.header_state = (c == cn ? .h_CON : .h_general)
 
-      case s_header_field:
-      {
-        const char* start = p;
-        for (; p != data + len; p++) {
-          ch = *p;
-          c = TOKEN(ch);
-
-          if (!c)
-            break;
-
-          switch (parser->header_state) {
-            case h_general:
-              break;
-
-            case h_C:
-              self.index++;
-              parser->header_state = (c == 'o' ? h_CO : h_general);
-              break;
-
-            case h_CO:
-              self.index++;
-              parser->header_state = (c == 'n' ? h_CON : h_general);
-              break;
-
-            case h_CON:
-              self.index++;
-              switch (c) {
-                case 'n':
-                  parser->header_state = h_matching_connection;
-                  break;
-                case 't':
-                  parser->header_state = h_matching_content_length;
-                  break;
-                default:
-                  parser->header_state = h_general;
-                  break;
+            case .h_CON:
+              self.index += 1
+              switch c {
+                case cn: self.header_state = .h_matching_connection
+                case ct: self.header_state = .h_matching_content_length
+                default: self.header_state = .h_general
               }
-              break;
 
             /* connection */
 
-            case h_matching_connection:
-              self.index++;
-              if (self.index > sizeof(CONNECTION)-1
-                  || c != CONNECTION[self.index]) {
-                parser->header_state = h_general;
-              } else if (self.index == sizeof(CONNECTION)-2) {
-                parser->header_state = h_connection;
+            case .h_matching_connection:
+              self.index += 1
+              if self.index > lCONNECTION || c != CONNECTION[self.index] {
+                self.header_state = .h_general;
+              } else if self.index == lCONNECTION - 1 {
+                self.header_state = .h_connection;
               }
               break;
 
             /* proxy-connection */
 
-            case h_matching_proxy_connection:
-              self.index++;
-              if (self.index > sizeof(PROXY_CONNECTION)-1
+            case .h_matching_proxy_connection:
+              self.index += 1
+              if (self.index > lPROXY_CONNECTION
                   || c != PROXY_CONNECTION[self.index]) {
-                parser->header_state = h_general;
-              } else if (self.index == sizeof(PROXY_CONNECTION)-2) {
-                parser->header_state = h_connection;
+                self.header_state = .h_general;
+              } else if self.index == lPROXY_CONNECTION-1 {
+                self.header_state = .h_connection;
               }
-              break;
 
             /* content-length */
 
-            case h_matching_content_length:
-              self.index++;
-              if (self.index > sizeof(CONTENT_LENGTH)-1
+            case .h_matching_content_length:
+              self.index += 1
+              if (self.index > lCONTENT_LENGTH
                   || c != CONTENT_LENGTH[self.index]) {
-                parser->header_state = h_general;
-              } else if (self.index == sizeof(CONTENT_LENGTH)-2) {
-                parser->header_state = h_content_length;
+                self.header_state = .h_general;
+              } else if self.index == lCONTENT_LENGTH-1 {
+                self.header_state = .h_content_length;
               }
-              break;
 
             /* transfer-encoding */
 
-            case h_matching_transfer_encoding:
-              self.index++;
-              if (self.index > sizeof(TRANSFER_ENCODING)-1
+            case .h_matching_transfer_encoding:
+              self.index += 1
+              if (self.index > lTRANSFER_ENCODING
                   || c != TRANSFER_ENCODING[self.index]) {
-                parser->header_state = h_general;
-              } else if (self.index == sizeof(TRANSFER_ENCODING)-2) {
-                parser->header_state = h_transfer_encoding;
+                self.header_state = .h_general;
+              } else if self.index == lTRANSFER_ENCODING-1 {
+                self.header_state = .h_transfer_encoding;
               }
-              break;
 
             /* upgrade */
 
-            case h_matching_upgrade:
-              self.index++;
-              if (self.index > sizeof(UPGRADE)-1
-                  || c != UPGRADE[self.index]) {
-                parser->header_state = h_general;
-              } else if (self.index == sizeof(UPGRADE)-2) {
-                parser->header_state = h_upgrade;
+            case .h_matching_upgrade:
+              self.index += 1
+              
+              if self.index > lUPGRADE || c != UPGRADE[self.index] {
+                self.header_state = .h_general;
+              } else if self.index == lUPGRADE-1 {
+                self.header_state = .h_upgrade;
               }
-              break;
 
-            case h_connection:
-            case h_content_length:
-            case h_transfer_encoding:
-            case h_upgrade:
-              if (ch != ' ') parser->header_state = h_general;
-              break;
+            case .h_connection:        fallthrough
+            case .h_content_length:    fallthrough
+            case .h_transfer_encoding: fallthrough
+            case .h_upgrade:
+              if ch != cSPACE { self.header_state = .h_general }
 
             default:
-              assert(0 && "Unknown header_state");
-              break;
+              assert(false, "Unknown header_state")
           }
+          
+          p += 1
         }
 
-        COUNT_HEADER_SIZE(p - start);
+        COUNT_HEADER_SIZE(p - start)
 
-        if (p == data + len) {
-          --p;
-          break;
+        if p == data + len {
+          p -= 1
+          break
         }
 
-        if (ch == ':') {
-          UPDATE_STATE(s_header_value_discard_ws);
-          CALLBACK_DATA(header_field);
-          break;
+        if ch == cCOLON {
+          UPDATE_STATE(.s_header_value_discard_ws);
+          
+          // CALLBACK_DATA(header_field);
+          let rc = CALLBACK_DATA(onHeaderField, &header_field_mark,
+                                 &CURRENT_STATE, p, data)
+          if let rc = rc { return rc } // error
+          break
         }
 
-        SET_ERRNO(HPE_INVALID_HEADER_TOKEN);
-        goto error;
-      }
+        return gotoError(.INVALID_HEADER_TOKEN)
+
+        /*
 
       case s_header_value_discard_ws:
         if (ch == ' ' || ch == '\t') break;
@@ -949,18 +914,18 @@ public class HTTPParser {
 
         c = LOWER(ch);
 
-        switch (parser->header_state) {
+        switch (self.header_state) {
           case h_upgrade:
             parser->flags |= F_UPGRADE;
-            parser->header_state = h_general;
+            self.header_state = h_general;
             break;
 
           case h_transfer_encoding:
             /* looking for 'Transfer-Encoding: chunked' */
             if ('c' == c) {
-              parser->header_state = h_matching_transfer_encoding_chunked;
+              self.header_state = h_matching_transfer_encoding_chunked;
             } else {
-              parser->header_state = h_general;
+              self.header_state = h_general;
             }
             break;
 
@@ -976,14 +941,14 @@ public class HTTPParser {
           case h_connection:
             /* looking for 'Connection: keep-alive' */
             if (c == 'k') {
-              parser->header_state = h_matching_connection_keep_alive;
+              self.header_state = h_matching_connection_keep_alive;
             /* looking for 'Connection: close' */
             } else if (c == 'c') {
-              parser->header_state = h_matching_connection_close;
+              self.header_state = h_matching_connection_close;
             } else if (c == 'u') {
-              parser->header_state = h_matching_connection_upgrade;
+              self.header_state = h_matching_connection_upgrade;
             } else {
-              parser->header_state = h_matching_connection_token;
+              self.header_state = h_matching_connection_token;
             }
             break;
 
@@ -992,7 +957,7 @@ public class HTTPParser {
             break;
 
           default:
-            parser->header_state = h_general;
+            self.header_state = h_general;
             break;
         }
         break;
@@ -1001,12 +966,12 @@ public class HTTPParser {
       case s_header_value:
       {
         const char* start = p;
-        enum header_states h_state = (enum header_states) parser->header_state;
+        enum header_states h_state = (enum header_states) self.header_state;
         for (; p != data + len; p++) {
           ch = *p;
           if (ch == CR) {
             UPDATE_STATE(s_header_almost_done);
-            parser->header_state = h_state;
+            self.header_state = h_state;
             CALLBACK_DATA(header_value);
             break;
           }
@@ -1014,7 +979,7 @@ public class HTTPParser {
           if (ch == LF) {
             UPDATE_STATE(s_header_almost_done);
             COUNT_HEADER_SIZE(p - start);
-            parser->header_state = h_state;
+            self.header_state = h_state;
             CALLBACK_DATA_NOADVANCE(header_value);
             REEXECUTE();
           }
@@ -1060,7 +1025,7 @@ public class HTTPParser {
 
               if (UNLIKELY(!IS_NUM(ch))) {
                 SET_ERRNO(HPE_INVALID_CONTENT_LENGTH);
-                parser->header_state = h_state;
+                self.header_state = h_state;
                 goto error;
               }
 
@@ -1071,7 +1036,7 @@ public class HTTPParser {
               /* Overflow? Test against a conservative limit for simplicity. */
               if (UNLIKELY((ULLONG_MAX - 10) / 10 < parser->content_length)) {
                 SET_ERRNO(HPE_INVALID_CONTENT_LENGTH);
-                parser->header_state = h_state;
+                self.header_state = h_state;
                 goto error;
               }
 
@@ -1175,7 +1140,7 @@ public class HTTPParser {
               break;
           }
         }
-        parser->header_state = h_state;
+        self.header_state = h_state;
 
         COUNT_HEADER_SIZE(p - start);
 
@@ -1200,7 +1165,7 @@ public class HTTPParser {
         }
 
         /* finished the header */
-        switch (parser->header_state) {
+        switch (self.header_state) {
           case h_connection_keep_alive:
             parser->flags |= F_CONNECTION_KEEP_ALIVE;
             break;
@@ -1234,7 +1199,7 @@ public class HTTPParser {
           UPDATE_STATE(s_header_value_discard_ws);
           break;
         } else {
-          switch (parser->header_state) {
+          switch (self.header_state) {
             case h_connection_keep_alive:
               parser->flags |= F_CONNECTION_KEEP_ALIVE;
               break;
@@ -1545,9 +1510,7 @@ public class HTTPParser {
       }
       
       // well, this recurses ... which is likely very bad
-      if let len = gotoReexecute() { // error?
-        return len
-      }
+      if let len = gotoReexecute() { return len } // error?
     
       // FOR LOOP END
       p += 1
@@ -1658,8 +1621,27 @@ public class HTTPParser {
     }
     return true
   }
-  
 }
+
+
+// HH: this is crap
+private let PROXY_CONNECTION   = "proxy-connection".makeCString()
+private let CONNECTION         = "connection".makeCString()
+private let CONTENT_LENGTH     = "content-length".makeCString()
+private let TRANSFER_ENCODING  = "transfer-encoding".makeCString()
+private let UPGRADE            = "upgrade".makeCString()
+private let CHUNKED            = "chunked".makeCString()
+private let KEEP_ALIVE         = "keep-alive".makeCString()
+private let CLOSE              = "close".makeCString()
+
+private let lPROXY_CONNECTION  = 16
+private let lCONNECTION        = 10
+private let lCONTENT_LENGTH    = 14
+private let lTRANSFER_ENCODING = 17 // strlen(TRANSFER_ENCODING)
+private let lUPGRADE           =  7 // strlen(UPGRADE)
+private let lCHUNKED           =  7 // strlen(CHUNKED)
+private let lKEEP_ALIVE        = 10 // strlen(KEEP_ALIVE)
+private let lCLOSE             =  5 // strlen(CLOSE)
 
 
 /* Tokens as defined by rfc 2616. Also lowercases them.

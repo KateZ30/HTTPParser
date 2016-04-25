@@ -45,6 +45,13 @@ let cS : CChar = 83
 let cT : CChar = 84
 let cU : CChar = 85 // U
 
+let cc : CChar =  99 // c
+let cn : CChar = 110 // n
+let co : CChar = 111 // o
+let cp : CChar = 112 // p
+let ct : CChar = 116 // t
+let cu : CChar = 117 // u
+
 let c0 : CChar = 48 // 0
 let c1 : CChar = 49
 let c2 : CChar = 50
