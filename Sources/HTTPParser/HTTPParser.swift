@@ -128,6 +128,7 @@ public class HTTPParser {
   
   // MARK: - Callbacks
   
+  /// Run the notify callback FOR, returning ER if it fails
   func CALLBACK_NOTIFY_(cb: http_cb?,
                         _ CURRENT_STATE : ParserState,
                         _ ER: size_t)
@@ -135,6 +136,7 @@ public class HTTPParser {
   {
     // Note: the only reason the state is returned is that the callback may
     //       have modified it.
+    // TODO: rewrite using inout
     guard let cb = cb else { return ( CURRENT_STATE, nil ) }
     
     self.state = CURRENT_STATE
@@ -149,6 +151,8 @@ public class HTTPParser {
     
     return ( newState, len )
   }
+  
+  /// Run the notify callback FOR and consume the current byte
   func CALLBACK_NOTIFY(cb: http_cb?,
                        _ CURRENT_STATE : ParserState,
                        _ p:    UnsafePointer<CChar>,
@@ -158,6 +162,8 @@ public class HTTPParser {
     let len = p - data + 1
     return CALLBACK_NOTIFY_(cb, CURRENT_STATE, len)
   }
+  
+  /// Run the notify callback FOR and don't consume the current byte
   func CALLBACK_NOTIFY_NOADVANCE(cb: http_cb?,
                                  _ CURRENT_STATE : ParserState,
                                  _ p:    UnsafePointer<CChar>,
@@ -166,6 +172,55 @@ public class HTTPParser {
   {
     let len = p - data
     return CALLBACK_NOTIFY_(cb, CURRENT_STATE, len)
+  }
+  
+  /// Run data callback FOR with LEN bytes, returning ER if it fails
+  func CALLBACK_DATA_(cb: http_data_cb?,
+                      inout _ mark : UnsafePointer<CChar>,
+                      inout _ CURRENT_STATE : ParserState,
+                      _ len: size_t, _ ER: size_t)
+       -> size_t?
+  {
+    assert(error == .OK)
+    
+    if mark != nil {
+      if let cb = cb {
+        self.state = CURRENT_STATE
+        if 0 != cb(self, mark, len) {
+          // TODO: base this on cb
+          error = .CB_message_begin // SET_ERRNO(HPE_CB_##FOR)
+        }
+        CURRENT_STATE = self.state // in case the CB patched it
+        
+        /* We either errored above or got paused; get out */
+        if error != .OK {
+          return ER
+        }
+      }
+      
+      mark = nil // inout, propagates to caller
+    }
+    
+    return nil
+  }
+  
+  /// Run the data callback FOR and consume the current byte
+  func CALLBACK_DATA(cb: http_data_cb?,
+                     inout _ mark : UnsafePointer<CChar>,
+                     inout _ CURRENT_STATE : ParserState,
+                     _ p:    UnsafePointer<CChar>,
+                     _ data: UnsafePointer<CChar>) -> size_t?
+  {
+    return CALLBACK_DATA_(cb, &mark, &CURRENT_STATE, p - mark, p - data + 1)
+  }
+  /// Run the data callback FOR and consume the current byte
+  func CALLBACK_DATA_NOADVANCE(cb: http_data_cb?,
+                     inout _ mark : UnsafePointer<CChar>,
+                     inout _ CURRENT_STATE : ParserState,
+                     _ p:    UnsafePointer<CChar>,
+                     _ data: UnsafePointer<CChar>) -> size_t?
+  {
+    return CALLBACK_DATA_(cb, &mark, &CURRENT_STATE, p - mark, p - data)
   }
   
   
@@ -232,6 +287,10 @@ public class HTTPParser {
       
       default: break
     }
+    
+    // `MARK` macro in original:
+    //    #define MARK(FOR) if (!FOR##_mark)  FOR##_mark = p;
+    
     
     func RETURN(V: size_t) -> size_t {
       self.state = CURRENT_STATE
@@ -409,28 +468,29 @@ public class HTTPParser {
         case .s_res_status_start:
           if ch == CR { UPDATE_STATE(.s_res_line_almost_done); break }
           if ch == LF { UPDATE_STATE(.s_header_field_start);   break }
-
-// TODO:
-          //MARK(status);
+          if status_mark == nil { status_mark = p } // MARK(status);
           UPDATE_STATE(.s_res_status);
           self.index = 0;
 
+        case .s_res_status:
+          if ch == CR {
+            UPDATE_STATE(.s_res_line_almost_done)
+            //CALLBACK_DATA(status)
+            let rc = CALLBACK_DATA(onStatus, &status_mark, &CURRENT_STATE,
+                                   p, data)
+            if let rc = rc { return rc } // error
+            break
+          }
+          
+          if ch == LF {
+            UPDATE_STATE(.s_header_field_start)
+            let rc = CALLBACK_DATA(onStatus, &status_mark, &CURRENT_STATE,
+                                   p, data)
+            if let rc = rc { return rc } // error
+            break
+          }
+
         /*
-      case s_res_status:
-        if (ch == CR) {
-          UPDATE_STATE(s_res_line_almost_done);
-          CALLBACK_DATA(status);
-          break;
-        }
-
-        if (ch == LF) {
-          UPDATE_STATE(s_header_field_start);
-          CALLBACK_DATA(status);
-          break;
-        }
-
-        break;
-
       case s_res_line_almost_done:
         STRICT_CHECK(ch != LF);
         UPDATE_STATE(s_header_field_start);
