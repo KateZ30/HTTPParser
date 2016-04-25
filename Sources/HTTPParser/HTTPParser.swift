@@ -130,48 +130,43 @@ public class HTTPParser {
   
   /// Run the notify callback FOR, returning ER if it fails
   func CALLBACK_NOTIFY_(cb: http_cb?,
-                        _ CURRENT_STATE : ParserState,
+                        inout _ CURRENT_STATE : ParserState,
                         _ ER: size_t)
-       -> ( ParserState, size_t? )
+       -> size_t?
   {
-    // Note: the only reason the state is returned is that the callback may
-    //       have modified it.
-    // TODO: rewrite using inout
-    guard let cb = cb else { return ( CURRENT_STATE, nil ) }
+    guard let cb = cb else { return nil }
     
     self.state = CURRENT_STATE
     if cb(self) != 0 {
-      // TODO: base this on cb
+      // FIXME: base this on cb / pass in error
       error = .CB_message_begin
     }
     
-    let newState = self.state
-    let len      : size_t? = error != .OK ? ER : nil
+    CURRENT_STATE = self.state
     // The original macro has a hard return!
-    
-    return ( newState, len )
+    return error != .OK ? ER : nil
   }
   
   /// Run the notify callback FOR and consume the current byte
   func CALLBACK_NOTIFY(cb: http_cb?,
-                       _ CURRENT_STATE : ParserState,
+                       inout _ CURRENT_STATE : ParserState,
                        _ p:    UnsafePointer<CChar>,
                        _ data: UnsafePointer<CChar>)
-    -> ( ParserState, size_t? )
+    -> size_t?
   {
     let len = p - data + 1
-    return CALLBACK_NOTIFY_(cb, CURRENT_STATE, len)
+    return CALLBACK_NOTIFY_(cb, &CURRENT_STATE, len)
   }
   
   /// Run the notify callback FOR and don't consume the current byte
   func CALLBACK_NOTIFY_NOADVANCE(cb: http_cb?,
-                                 _ CURRENT_STATE : ParserState,
+                                 inout _ CURRENT_STATE : ParserState,
                                  _ p:    UnsafePointer<CChar>,
                                  _ data: UnsafePointer<CChar>)
-    -> ( ParserState, size_t? )
+    -> size_t?
   {
     let len = p - data
-    return CALLBACK_NOTIFY_(cb, CURRENT_STATE, len)
+    return CALLBACK_NOTIFY_(cb, &CURRENT_STATE, len)
   }
   
   /// Run data callback FOR with LEN bytes, returning ER if it fails
@@ -241,11 +236,9 @@ public class HTTPParser {
           /* Use of CALLBACK_NOTIFY() here would erroneously return 1 byte read if
            * we got paused.
            */
-          let ( newState, len ) =
-            CALLBACK_NOTIFY_NOADVANCE(onMessageComplete, CURRENT_STATE, p, data)
+          let len = CALLBACK_NOTIFY_NOADVANCE(onMessageComplete, &CURRENT_STATE,
+                                              p, data)
           if let len = len { return len } // error
-          CURRENT_STATE = newState
-          
           return 0
           
         case .s_dead:             return 0
@@ -328,10 +321,8 @@ public class HTTPParser {
           if ch == 72 /* 'H' */ {
             UPDATE_STATE(.s_res_or_resp_H);
             
-            let ( newState, len ) =
-              CALLBACK_NOTIFY(onMessageBegin, CURRENT_STATE, p, data)
+            let len = CALLBACK_NOTIFY(onMessageBegin, &CURRENT_STATE, p, data)
             if let len = len { return len } // error
-            CURRENT_STATE = newState
           }
           else {
             self.type = .HTTP_REQUEST;
@@ -368,10 +359,8 @@ public class HTTPParser {
             default: return gotoError(.INVALID_CONSTANT)
           }
           
-          let ( newState, len ) =
-            CALLBACK_NOTIFY(onMessageBegin, CURRENT_STATE, p, data)
+          let len = CALLBACK_NOTIFY(onMessageBegin, &CURRENT_STATE, p, data)
           if let len = len { return len } // error
-          CURRENT_STATE = newState
         
         case .s_res_H:
           STRICT_CHECK(ch != 84 /* 'T' */)
@@ -530,11 +519,9 @@ public class HTTPParser {
           UPDATE_STATE(.s_req_method);
           
           // CALLBACK_NOTIFY(message_begin);
-          let ( newState, len ) =
-            CALLBACK_NOTIFY(onMessageBegin, CURRENT_STATE, p, data)
+          let len = CALLBACK_NOTIFY(onMessageBegin, &CURRENT_STATE, p, data)
           if let len = len { return len } // error
-          CURRENT_STATE = newState
-
+          
           break;
 
         /*
