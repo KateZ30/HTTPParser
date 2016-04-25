@@ -28,3 +28,11 @@ parsertrace_g
 *.sdf
 *.vsp
 *.psess
+
+# Swift
+.DS_Store
+*~
+.build
+*.xcodeproj/project.xcworkspace/xcuserdata
+*.xcodeproj/xcuserdata
+
