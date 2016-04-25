@@ -1521,10 +1521,22 @@ public class HTTPParser {
   }
  
   public func pause() {
-    // TODO
+    /* Users should only be pausing/unpausing a parser that is not in an error
+     * state. In non-debug builds, there's not much that we can do about this
+     * other than ignore it.
+     */
+    if error == .OK || error == .PAUSED {
+      error = .PAUSED
+    } else {
+      assert(false, "Attempting to pause parser in error state")
+    }
   }
   public func resume() {
-    // TODO
+    if error == .OK || error == .PAUSED {
+      error = .OK
+    } else {
+      assert(false, "Attempting to pause parser in error state")
+    }
   }
   
   
