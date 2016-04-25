@@ -1120,102 +1120,89 @@ public class HTTPParser {
             p -= 1
           }
 
-        /*
-
-      case s_header_almost_done:
-      {
-        STRICT_CHECK(ch != LF);
-
-        UPDATE_STATE(s_header_value_lws);
-        break;
-      }
-
-      case s_header_value_lws:
-      {
-        if (ch == ' ' || ch == '\t') {
-          UPDATE_STATE(s_header_value_start);
-          REEXECUTE();
-        }
-
-        /* finished the header */
-        switch (self.header_state) {
-          case h_connection_keep_alive:
-            parser->flags |= F_CONNECTION_KEEP_ALIVE;
-            break;
-          case h_connection_close:
-            parser->flags |= F_CONNECTION_CLOSE;
-            break;
-          case h_transfer_encoding_chunked:
-            parser->flags |= F_CHUNKED;
-            break;
-          case h_connection_upgrade:
-            parser->flags |= F_CONNECTION_UPGRADE;
-            break;
-          default:
-            break;
-        }
-
-        UPDATE_STATE(s_header_field_start);
-        REEXECUTE();
-      }
-
-      case s_header_value_discard_ws_almost_done:
-      {
-        STRICT_CHECK(ch != LF);
-        UPDATE_STATE(s_header_value_discard_lws);
-        break;
-      }
-
-      case s_header_value_discard_lws:
-      {
-        if (ch == ' ' || ch == '\t') {
-          UPDATE_STATE(s_header_value_discard_ws);
-          break;
-        } else {
-          switch (self.header_state) {
-            case h_connection_keep_alive:
-              parser->flags |= F_CONNECTION_KEEP_ALIVE;
-              break;
-            case h_connection_close:
-              parser->flags |= F_CONNECTION_CLOSE;
-              break;
-            case h_connection_upgrade:
-              parser->flags |= F_CONNECTION_UPGRADE;
-              break;
-            case h_transfer_encoding_chunked:
-              parser->flags |= F_CHUNKED;
-              break;
-            default:
-              break;
+        case .s_header_almost_done:
+          STRICT_CHECK(ch != LF)
+          UPDATE_STATE(.s_header_value_lws)
+          
+        case .s_header_value_lws:
+          if ch == cSPACE || ch == cTAB {
+            UPDATE_STATE(.s_header_value_start)
+            if let len = gotoReexecute() { return len }
           }
 
-          /* header value was empty */
-          MARK(header_value);
-          UPDATE_STATE(s_header_field_start);
-          CALLBACK_DATA_NOADVANCE(header_value);
-          REEXECUTE();
-        }
-      }
+          /* finished the header */
+          switch self.header_state {
+            case .h_connection_keep_alive:
+              self.flags.insert(.F_CONNECTION_KEEP_ALIVE)
+            case .h_connection_close:
+              self.flags.insert(.F_CONNECTION_CLOSE)
+            case .h_transfer_encoding_chunked:
+              self.flags.insert(.F_CHUNKED)
+            case .h_connection_upgrade:
+              self.flags.insert(.F_CONNECTION_UPGRADE)
+            default: break;
+          }
 
-      case s_headers_almost_done:
-      {
-        STRICT_CHECK(ch != LF);
+          UPDATE_STATE(.s_header_field_start)
+          if let len = gotoReexecute() { return len }
 
-        if (parser->flags & F_TRAILING) {
+        case .s_header_value_discard_ws_almost_done:
+          STRICT_CHECK(ch != LF)
+          UPDATE_STATE(.s_header_value_discard_lws)
+
+        case .s_header_value_discard_lws:
+          if (ch == cSPACE || ch == cTAB) {
+            UPDATE_STATE(.s_header_value_discard_ws)
+            break
+          } else {
+            switch self.header_state {
+              case .h_connection_keep_alive:
+                self.flags.insert(.F_CONNECTION_KEEP_ALIVE)
+              case .h_connection_close:
+                self.flags.insert(.F_CONNECTION_CLOSE)
+              case .h_connection_upgrade:
+                self.flags.insert(.F_CONNECTION_UPGRADE)
+              case .h_transfer_encoding_chunked:
+                self.flags.insert(.F_CHUNKED)
+              default: break
+            }
+
+            /* header value was empty */
+            // MARK(header_value);
+            if header_value_mark == nil { header_value_mark = p }
+            UPDATE_STATE(.s_header_field_start);
+            
+            let rc = CALLBACK_DATA_NOADVANCE(onHeaderValue,
+                                             &header_value_mark,
+                                             &CURRENT_STATE, p, data)
+            if let rc = rc { return rc } // error
+            
+            if let len = gotoReexecute() { return len }
+          }
+          // hh: TODO: I think this was a fallthrough, is that right?
+          //     might be a reexecute issue
+          assert(false, "reexecute fallthrough")
+
+      case .s_headers_almost_done:
+        STRICT_CHECK(ch != LF)
+
+        if self.flags.contains(.F_TRAILING) {
           /* End of a chunked request */
-          UPDATE_STATE(s_message_done);
-          CALLBACK_NOTIFY_NOADVANCE(chunk_complete);
-          REEXECUTE();
+          UPDATE_STATE(.s_message_done);
+          let len = CALLBACK_NOTIFY_NOADVANCE(onChunkComplete, &CURRENT_STATE,
+                                              p, data)
+          if let len = len { return len } // error
+          if let len = gotoReexecute() { return len }
         }
 
-        UPDATE_STATE(s_headers_done);
+        UPDATE_STATE(.s_headers_done);
 
         /* Set this here so that on_headers_complete() callbacks can see it */
-        parser->upgrade =
-          ((parser->flags & (F_UPGRADE | F_CONNECTION_UPGRADE)) ==
-           (F_UPGRADE | F_CONNECTION_UPGRADE) ||
-           self.method == .CONNECT);
-
+        self.upgrade =
+          ((self.flags.contains(.F_UPGRADE)
+            && self.flags.contains(.F_CONNECTION_UPGRADE))
+           || self.method == .CONNECT)
+        
         /* Here we call the headers_complete callback. This is somewhat
          * different than other callbacks because if the user returns 1, we
          * will interpret that as saying that this message has no body. This
@@ -1225,27 +1212,31 @@ public class HTTPParser {
          * We'd like to use CALLBACK_NOTIFY_NOADVANCE() here but we cannot, so
          * we have to simulate it by handling a change in errno below.
          */
-        if (settings->on_headers_complete) {
-          switch (settings->on_headers_complete(parser)) {
+        if let cb = onHeadersComplete {
+          switch cb(self) {
             case 0:
               break;
 
             case 1:
-              parser->flags |= F_SKIPBODY;
+              self.flags.insert(.F_SKIPBODY)
               break;
 
             default:
-              SET_ERRNO(HPE_CB_headers_complete);
-              RETURN(p - data); /* Error */
+              error = .CB_headers_complete
+              return RETURN(p - data) /* Error */
           }
         }
 
-        if (HTTP_PARSER_ERRNO(parser) != HPE_OK) {
-          RETURN(p - data);
+        if error != .OK {
+          return RETURN(p - data)
         }
 
-        REEXECUTE();
-      }
+        if let len = gotoReexecute() { return len }
+        // hh: TODO: I think this was a fallthrough, is that right?
+        //     might be a reexecute issue
+        assert(false, "reexecute fallthrough")
+
+        /*
 
       case s_headers_done:
       {
@@ -1323,7 +1314,7 @@ public class HTTPParser {
            * important for applications, but let's keep it for now.
            */
           CALLBACK_DATA_(body, p - body_mark + 1, p - data);
-          REEXECUTE();
+         if let len = gotoReexecute() { return len }
         }
 
         break;
