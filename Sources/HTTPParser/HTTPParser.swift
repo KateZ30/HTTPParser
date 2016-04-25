@@ -1913,8 +1913,17 @@ func TOKEN(c: CChar) -> CChar {
 }
 
 func IS_URL_CHAR(c: CChar) -> Bool {
-  fatalError("TODO: IS_URL_CHAR")
+  // TODO: I don't get that normal_url_char map yet.
+  return c != CR && c != LF && c > 32
+  // fatalError("TODO: IS_URL_CHAR")
   /*
+   #define BIT_AT(a, i) \
+       (!!((unsigned int) (a)[(unsigned int) (i) >> 3] & \
+       (1 << ((unsigned int) (i) & 7))))
+   #define BIT_AT(a, i) (!!(a[i >> 3] & (1 << (i & 7))))
+   
+   let normal_url_char : [ UInt8 ] /* [32] */ = [ .. ]
+   
   if HTTP_PARSER_STRICT {
     return (BIT_AT(normal_url_char, (unsigned char)c))
   }
