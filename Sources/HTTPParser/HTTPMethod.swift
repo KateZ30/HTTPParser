@@ -26,6 +26,12 @@
  * IN THE SOFTWARE.
  */
 
+#if os(Linux)
+  import Glibc
+#else
+  import Darwin
+#endif
+
 public enum HTTPMethod : Int {
   case DELETE = 0
   
@@ -206,6 +212,119 @@ extension HTTPMethod : CustomStringConvertible {
   }
 }
 
+extension String {
+  
+  func makeCString() -> UnsafePointer<CChar> {
+    var ptr : UnsafeMutablePointer<CChar> = nil
+    self.withCString { cstr in
+      let len = strlen(cstr)
+      ptr = UnsafeMutablePointer<CChar>.alloc(Int(len) + 1)
+      strcpy(ptr, cstr)
+    }
+    return UnsafePointer<CChar>(ptr)
+  }
+  
+}
+
+public extension HTTPMethod {
+  
+  // TBD: I don't know. Yes, this allocs, but I have no idea how to do this
+  //      better in Swift. Sure, we could use a CChar array instead of a
+  //      string, but that doesn't really help much.
+  static let csGET         = "GET".makeCString()
+  static let csHEAD        = "HEAD".makeCString()
+  static let csPUT         = "PUT".makeCString()
+  static let csDELETE      = "DELETE".makeCString()
+  static let csPOST        = "POST".makeCString()
+  static let csOPTIONS     = "OPTIONS".makeCString()
+  
+  static let csPROPFIND    = "PROPFIND".makeCString()
+  static let csPROPPATCH   = "PROPPATCH".makeCString()
+  static let csMKCOL       = "MKCOL".makeCString()
+  
+  static let csREPORT      = "REPORT".makeCString()
+  
+  static let csMKCALENDAR  = "MKCALENDAR".makeCString()
+  
+  static let csCONNECT     = "CONNECT".makeCString()
+  static let csTRACE       = "TRACE".makeCString()
+  
+  static let csCOPY        = "COPY".makeCString()
+  static let csMOVE        = "MOVE".makeCString()
+  static let csLOCK        = "LOCK".makeCString()
+  static let csUNLOCK      = "UNLOCK".makeCString()
+  
+  static let csSEARCH      = "SEARCH".makeCString()
+  
+  static let csMKACTIVITY  = "MKACTIVITY".makeCString()
+  static let csCHECKOUT    = "CHECKOUT".makeCString()
+  static let csMERGE       = "MERGE".makeCString()
+  
+  static let csMSEARCH     = "M-SEARCH".makeCString()
+  static let csNOTIFY      = "NOTIFY".makeCString()
+  static let csSUBSCRIBE   = "SUBSCRIBE".makeCString()
+  static let csUNSUBSCRIBE = "UNSUBSCRIBE".makeCString()
+  
+  static let csPATCH       = "PATCH".makeCString()
+  static let csPURGE       = "PURGE".makeCString()
+  
+  static let csACL         = "ACL".makeCString()
+  static let csBIND        = "BIND".makeCString()
+  static let csUNBIND      = "UNBIND".makeCString()
+  static let csREBIND      = "REBIND".makeCString()
+  
+  static let csLINK        = "LINK".makeCString()
+  static let csUNLINK      = "UNLINK".makeCString()
+  
+  public var csMethod: UnsafePointer<CChar> {
+    switch self {
+      case .GET:         return HTTPMethod.csGET
+      case .HEAD:        return HTTPMethod.csHEAD
+      case .PUT:         return HTTPMethod.csPUT
+      case .DELETE:      return HTTPMethod.csDELETE
+      case .POST:        return HTTPMethod.csPOST
+      case .OPTIONS:     return HTTPMethod.csOPTIONS
+        
+      case .PROPFIND:    return HTTPMethod.csPROPFIND
+      case .PROPPATCH:   return HTTPMethod.csPROPPATCH
+      case .MKCOL:       return HTTPMethod.csMKCOL
+        
+      case .REPORT:      return HTTPMethod.csREPORT
+        
+      case .MKCALENDAR:  return HTTPMethod.csMKCALENDAR
+
+      case .CONNECT:     return HTTPMethod.csCONNECT
+      case .TRACE:       return HTTPMethod.csTRACE
+      
+      case .COPY:        return HTTPMethod.csCOPY
+      case .MOVE:        return HTTPMethod.csMOVE
+      case .LOCK:        return HTTPMethod.csLOCK
+      case .UNLOCK:      return HTTPMethod.csUNLOCK
+      
+      case .SEARCH:      return HTTPMethod.csSEARCH
+      
+      case .MKACTIVITY:  return HTTPMethod.csMKACTIVITY
+      case .CHECKOUT:    return HTTPMethod.csCHECKOUT
+      case .MERGE:       return HTTPMethod.csMERGE
+      
+      case .MSEARCH:     return HTTPMethod.csMSEARCH
+      case .NOTIFY:      return HTTPMethod.csNOTIFY
+      case .SUBSCRIBE:   return HTTPMethod.csSUBSCRIBE
+      case .UNSUBSCRIBE: return HTTPMethod.csUNSUBSCRIBE
+
+      case .PATCH:       return HTTPMethod.csPATCH
+      case .PURGE:       return HTTPMethod.csPURGE
+      
+      case .ACL:         return HTTPMethod.csACL
+      case .BIND:        return HTTPMethod.csBIND
+      case .UNBIND:      return HTTPMethod.csUNBIND
+      case .REBIND:      return HTTPMethod.csREBIND
+      
+      case .LINK:        return HTTPMethod.csLINK
+      case .UNLINK:      return HTTPMethod.csUNLINK
+    }
+  }
+}
 
 // original compat
 
