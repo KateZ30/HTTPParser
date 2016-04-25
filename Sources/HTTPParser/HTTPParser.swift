@@ -225,7 +225,7 @@ public class HTTPParser {
   /// `error` on error.
   public func execute(data: UnsafePointer<CChar>, _ len: size_t) -> size_t {
     /* We're in an error state. Don't bother doing anything. */
-    guard error != .OK else { return 0 }
+    guard error == .OK else { return 0 }
     
     var p             = data
     var CURRENT_STATE = self.state
