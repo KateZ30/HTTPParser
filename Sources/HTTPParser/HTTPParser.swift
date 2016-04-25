@@ -258,6 +258,7 @@ public class HTTPParser {
     var header_field_mark : UnsafePointer<CChar> = nil
     var header_value_mark : UnsafePointer<CChar> = nil
     var url_mark          : UnsafePointer<CChar> = nil
+    var body_mark         : UnsafePointer<CChar> = nil
     var status_mark       : UnsafePointer<CChar> = nil
     
     switch CURRENT_STATE {
@@ -1183,279 +1184,272 @@ public class HTTPParser {
           //     might be a reexecute issue
           assert(false, "reexecute fallthrough")
 
-      case .s_headers_almost_done:
-        STRICT_CHECK(ch != LF)
+        case .s_headers_almost_done:
+          STRICT_CHECK(ch != LF)
 
-        if self.flags.contains(.F_TRAILING) {
-          /* End of a chunked request */
-          UPDATE_STATE(.s_message_done);
-          let len = CALLBACK_NOTIFY_NOADVANCE(onChunkComplete, &CURRENT_STATE,
-                                              p, data)
-          if let len = len { return len } // error
-          if let len = gotoReexecute() { return len }
-        }
-
-        UPDATE_STATE(.s_headers_done);
-
-        /* Set this here so that on_headers_complete() callbacks can see it */
-        self.upgrade =
-          ((self.flags.contains(.F_UPGRADE)
-            && self.flags.contains(.F_CONNECTION_UPGRADE))
-           || self.method == .CONNECT)
-        
-        /* Here we call the headers_complete callback. This is somewhat
-         * different than other callbacks because if the user returns 1, we
-         * will interpret that as saying that this message has no body. This
-         * is needed for the annoying case of recieving a response to a HEAD
-         * request.
-         *
-         * We'd like to use CALLBACK_NOTIFY_NOADVANCE() here but we cannot, so
-         * we have to simulate it by handling a change in errno below.
-         */
-        if let cb = onHeadersComplete {
-          switch cb(self) {
-            case 0:
-              break;
-
-            case 1:
-              self.flags.insert(.F_SKIPBODY)
-              break;
-
-            default:
-              error = .CB_headers_complete
-              return RETURN(p - data) /* Error */
+          if self.flags.contains(.F_TRAILING) {
+            /* End of a chunked request */
+            UPDATE_STATE(.s_message_done);
+            let len = CALLBACK_NOTIFY_NOADVANCE(onChunkComplete, &CURRENT_STATE,
+                                                p, data)
+            if let len = len { return len } // error
+            if let len = gotoReexecute() { return len }
           }
-        }
 
-        if error != .OK {
-          return RETURN(p - data)
-        }
+          UPDATE_STATE(.s_headers_done);
 
-        if let len = gotoReexecute() { return len }
-        // hh: TODO: I think this was a fallthrough, is that right?
-        //     might be a reexecute issue
-        assert(false, "reexecute fallthrough")
+          /* Set this here so that on_headers_complete() callbacks can see it */
+          self.upgrade =
+            ((self.flags.contains(.F_UPGRADE)
+              && self.flags.contains(.F_CONNECTION_UPGRADE))
+             || self.method == .CONNECT)
+          
+          /* Here we call the headers_complete callback. This is somewhat
+           * different than other callbacks because if the user returns 1, we
+           * will interpret that as saying that this message has no body. This
+           * is needed for the annoying case of recieving a response to a HEAD
+           * request.
+           *
+           * We'd like to use CALLBACK_NOTIFY_NOADVANCE() here but we cannot, so
+           * we have to simulate it by handling a change in errno below.
+           */
+          if let cb = onHeadersComplete {
+            switch cb(self) {
+              case 0:
+                break;
 
-        /*
+              case 1:
+                self.flags.insert(.F_SKIPBODY)
+                break;
 
-      case s_headers_done:
-      {
-        int hasBody;
-        STRICT_CHECK(ch != LF);
-
-        parser->nread = 0;
-
-        hasBody = parser->flags & F_CHUNKED ||
-          (parser->content_length > 0 && parser->content_length != ULLONG_MAX);
-        if (parser->upgrade && (self.method == .CONNECT ||
-                                (parser->flags & F_SKIPBODY) || !hasBody)) {
-          /* Exit, the rest of the message is in a different protocol. */
-          UPDATE_STATE(NEW_MESSAGE());
-          CALLBACK_NOTIFY(message_complete);
-          RETURN((p - data) + 1);
-        }
-
-        if (parser->flags & F_SKIPBODY) {
-          UPDATE_STATE(NEW_MESSAGE());
-          CALLBACK_NOTIFY(message_complete);
-        } else if (parser->flags & F_CHUNKED) {
-          /* chunked encoding - ignore Content-Length header */
-          UPDATE_STATE(s_chunk_size_start);
-        } else {
-          if (parser->content_length == 0) {
-            /* Content-Length header given but zero: Content-Length: 0\r\n */
-            UPDATE_STATE(NEW_MESSAGE());
-            CALLBACK_NOTIFY(message_complete);
-          } else if (parser->content_length != ULLONG_MAX) {
-            /* Content-Length header given and non-zero */
-            UPDATE_STATE(s_body_identity);
-          } else {
-            if (!http_message_needs_eof(parser)) {
-              /* Assume content-length 0 - read the next */
-              UPDATE_STATE(NEW_MESSAGE());
-              CALLBACK_NOTIFY(message_complete);
-            } else {
-              /* Read body until EOF */
-              UPDATE_STATE(s_body_identity_eof);
+              default:
+                error = .CB_headers_complete
+                return RETURN(p - data) /* Error */
             }
           }
-        }
 
-        break;
-      }
-
-      case s_body_identity:
-      {
-        uint64_t to_read = MIN(parser->content_length,
-                               (uint64_t) ((data + len) - p));
-
-        assert(parser->content_length != 0
-            && parser->content_length != ULLONG_MAX);
-
-        /* The difference between advancing content_length and p is because
-         * the latter will automaticaly advance on the next loop iteration.
-         * Further, if content_length ends up at 0, we want to see the last
-         * byte again for our message complete callback.
-         */
-        MARK(body);
-        parser->content_length -= to_read;
-        p += to_read - 1;
-
-        if (parser->content_length == 0) {
-          UPDATE_STATE(s_message_done);
-
-          /* Mimic CALLBACK_DATA_NOADVANCE() but with one extra byte.
-           *
-           * The alternative to doing this is to wait for the next byte to
-           * trigger the data callback, just as in every other case. The
-           * problem with this is that this makes it difficult for the test
-           * harness to distinguish between complete-on-EOF and
-           * complete-on-length. It's not clear that this distinction is
-           * important for applications, but let's keep it for now.
-           */
-          CALLBACK_DATA_(body, p - body_mark + 1, p - data);
-         if let len = gotoReexecute() { return len }
-        }
-
-        break;
-      }
-
-      /* read until EOF */
-      case s_body_identity_eof:
-        MARK(body);
-        p = data + len - 1;
-
-        break;
-
-      case s_message_done:
-        UPDATE_STATE(NEW_MESSAGE());
-        CALLBACK_NOTIFY(message_complete);
-        if (parser->upgrade) {
-          /* Exit, the rest of the message is in a different protocol. */
-          RETURN((p - data) + 1);
-        }
-        break;
-
-      case s_chunk_size_start:
-      {
-        assert(parser->nread == 1);
-        assert(parser->flags & F_CHUNKED);
-
-        unhex_val = unhex[(unsigned char)ch];
-        if (UNLIKELY(unhex_val == -1)) {
-          SET_ERRNO(HPE_INVALID_CHUNK_SIZE);
-          goto error;
-        }
-
-        parser->content_length = unhex_val;
-        UPDATE_STATE(s_chunk_size);
-        break;
-      }
-
-      case s_chunk_size:
-      {
-        uint64_t t;
-
-        assert(parser->flags & F_CHUNKED);
-
-        if (ch == CR) {
-          UPDATE_STATE(s_chunk_size_almost_done);
-          break;
-        }
-
-        unhex_val = unhex[(unsigned char)ch];
-
-        if (unhex_val == -1) {
-          if (ch == ';' || ch == ' ') {
-            UPDATE_STATE(s_chunk_parameters);
-            break;
+          if error != .OK {
+            return RETURN(p - data)
           }
 
-          SET_ERRNO(HPE_INVALID_CHUNK_SIZE);
-          goto error;
-        }
+          if let len = gotoReexecute() { return len }
+          // hh: TODO: I think this was a fallthrough, is that right?
+          //     might be a reexecute issue
+          assert(false, "reexecute fallthrough")
 
-        t = parser->content_length;
-        t *= 16;
-        t += unhex_val;
+        case .s_headers_done:
+          STRICT_CHECK(ch != LF);
 
-        /* Overflow? Test against a conservative limit for simplicity. */
-        if (UNLIKELY((ULLONG_MAX - 16) / 16 < parser->content_length)) {
-          SET_ERRNO(HPE_INVALID_CONTENT_LENGTH);
-          goto error;
-        }
+          self.nread = 0
 
-        parser->content_length = t;
-        break;
-      }
+          let hasBody = self.flags.contains(.F_CHUNKED) ||
+            (self.content_length > 0
+              && self.content_length != Int.max /* ULLONG_MAX */)
+          if (self.upgrade && (self.method == .CONNECT ||
+                                  (self.flags.contains(.F_SKIPBODY))
+                                   || !hasBody))
+          {
+            /* Exit, the rest of the message is in a different protocol. */
+            UPDATE_STATE(NEW_MESSAGE);
+            // CALLBACK_NOTIFY(message_complete);
+            let len = CALLBACK_NOTIFY(onMessageComplete, &CURRENT_STATE,
+                                      p, data)
+            if let len = len { return len } // error
+            return RETURN((p - data) + 1);
+          }
 
-      case s_chunk_parameters:
-      {
-        assert(parser->flags & F_CHUNKED);
-        /* just ignore this shit. TODO check for overflow */
-        if (ch == CR) {
-          UPDATE_STATE(s_chunk_size_almost_done);
-          break;
-        }
-        break;
-      }
+          if self.flags.contains(.F_SKIPBODY) {
+            UPDATE_STATE(NEW_MESSAGE);
+            // CALLBACK_NOTIFY(message_complete);
+            let len = CALLBACK_NOTIFY(onMessageComplete, &CURRENT_STATE,
+                                      p, data)
+            if let len = len { return len } // error
+          } else if self.flags.contains(.F_CHUNKED) {
+            /* chunked encoding - ignore Content-Length header */
+            UPDATE_STATE(.s_chunk_size_start);
+          } else {
+            if self.content_length == 0 {
+              /* Content-Length header given but zero: Content-Length: 0\r\n */
+              UPDATE_STATE(NEW_MESSAGE);
+              // CALLBACK_NOTIFY(message_complete);
+              let len = CALLBACK_NOTIFY(onMessageComplete, &CURRENT_STATE,
+                                        p, data)
+              if let len = len { return len } // error
+            } else if self.content_length != Int.max /* ULLONG_MAX */ {
+              /* Content-Length header given and non-zero */
+              UPDATE_STATE(.s_body_identity)
+            } else {
+              if (!messageNeedsEOF) {
+                /* Assume content-length 0 - read the next */
+                UPDATE_STATE(NEW_MESSAGE);
+                // CALLBACK_NOTIFY(message_complete);
+                let len = CALLBACK_NOTIFY(onMessageComplete, &CURRENT_STATE,
+                                          p, data)
+                if let len = len { return len } // error
+              } else {
+                /* Read body until EOF */
+                UPDATE_STATE(.s_body_identity_eof)
+              }
+            }
+          }
 
-      case s_chunk_size_almost_done:
-      {
-        assert(parser->flags & F_CHUNKED);
-        STRICT_CHECK(ch != LF);
+        case .s_body_identity:
+          let to_read : Int /* uint64_t */ = min(self.content_length,
+                                       ((data + len) - p));
 
-        parser->nread = 0;
+          assert(self.content_length != 0
+              && self.content_length != Int.max /* ULLONG_MAX */);
 
-        if (parser->content_length == 0) {
-          parser->flags |= F_TRAILING;
-          UPDATE_STATE(s_header_field_start);
-        } else {
-          UPDATE_STATE(s_chunk_data);
-        }
-        CALLBACK_NOTIFY(chunk_header);
-        break;
-      }
+          /* The difference between advancing content_length and p is because
+           * the latter will automaticaly advance on the next loop iteration.
+           * Further, if content_length ends up at 0, we want to see the last
+           * byte again for our message complete callback.
+           */
+          if body_mark == nil { body_mark = p } // MARK(body);
 
-      case s_chunk_data:
-      {
-        uint64_t to_read = MIN(parser->content_length,
-                               (uint64_t) ((data + len) - p));
+          self.content_length -= to_read;
+          p += to_read - 1;
 
-        assert(parser->flags & F_CHUNKED);
-        assert(parser->content_length != 0
-            && parser->content_length != ULLONG_MAX);
+          if (self.content_length == 0) {
+            UPDATE_STATE(.s_message_done);
 
-        /* See the explanation in s_body_identity for why the content
-         * length and data pointers are managed this way.
-         */
-        MARK(body);
-        parser->content_length -= to_read;
-        p += to_read - 1;
+            /* Mimic CALLBACK_DATA_NOADVANCE() but with one extra byte.
+             *
+             * The alternative to doing this is to wait for the next byte to
+             * trigger the data callback, just as in every other case. The
+             * problem with this is that this makes it difficult for the test
+             * harness to distinguish between complete-on-EOF and
+             * complete-on-length. It's not clear that this distinction is
+             * important for applications, but let's keep it for now.
+             */
+            let rc = CALLBACK_DATA_(onBody, &body_mark, &CURRENT_STATE,
+                                    p - body_mark + 1, p - data)
+            if let rc = rc { return rc }
+            
+            if let len = gotoReexecute() { return len }
+          }
 
-        if (parser->content_length == 0) {
-          UPDATE_STATE(s_chunk_data_almost_done);
-        }
+        
+        /* read until EOF */
+        case .s_body_identity_eof:
+          if body_mark == nil { body_mark = p } // MARK(body);
+          p = data + len - 1;
 
-        break;
-      }
+        case .s_message_done:
+          UPDATE_STATE(NEW_MESSAGE)
+          
+          // CALLBACK_NOTIFY(message_complete);
+          let len = CALLBACK_NOTIFY(onMessageComplete, &CURRENT_STATE,
+                                    p, data)
+          if let len = len { return len } // error
+          
+          if self.upgrade {
+            /* Exit, the rest of the message is in a different protocol. */
+            return RETURN((p - data) + 1);
+          }
 
-      case s_chunk_data_almost_done:
-        assert(parser->flags & F_CHUNKED);
-        assert(parser->content_length == 0);
-        STRICT_CHECK(ch != CR);
-        UPDATE_STATE(s_chunk_data_done);
-        CALLBACK_DATA(body);
-        break;
+        case .s_chunk_size_start:
+          assert(self.nread == 1);
+          assert(self.flags.contains(.F_CHUNKED))
 
-      case s_chunk_data_done:
-        assert(parser->flags & F_CHUNKED);
-        STRICT_CHECK(ch != LF);
-        parser->nread = 0;
-        UPDATE_STATE(s_chunk_size_start);
-        CALLBACK_NOTIFY(chunk_complete);
-        break;
-*/
+          let unhex_val = unhex[Int(ch)]; // (unsigned char)
+          guard unhex_val != -1 else {
+            return gotoError(.INVALID_CHUNK_SIZE)
+          }
+
+          self.content_length = Int(unhex_val)
+          UPDATE_STATE(.s_chunk_size);
+
+        case .s_chunk_size:
+          assert(self.flags.contains(.F_CHUNKED))
+
+          if ch == CR { UPDATE_STATE(.s_chunk_size_almost_done); break; }
+
+          let unhex_val = unhex[Int(ch)]
+
+          if unhex_val == -1 {
+            if ch == cSEMICOLON || ch == cSPACE {
+              UPDATE_STATE(.s_chunk_parameters);
+              break;
+            }
+
+            return gotoError(.INVALID_CHUNK_SIZE)
+          }
+
+          var t = self.content_length
+          t *= 16
+          t += Int(unhex_val)
+
+          /* Overflow? Test against a conservative limit for simplicity. */
+          if ((Int.max /*ULLONG_MAX*/ - 16) / 16 < self.content_length) {
+            return gotoError(.INVALID_CONTENT_LENGTH)
+          }
+          
+          self.content_length = t;
+
+        case .s_chunk_parameters:
+          assert(self.flags.contains(.F_CHUNKED))
+          /* just ignore this shit. TODO check for overflow */
+          if ch == CR {
+            UPDATE_STATE(.s_chunk_size_almost_done);
+          }
+
+        case .s_chunk_size_almost_done:
+          assert(self.flags.contains(.F_CHUNKED))
+          STRICT_CHECK(ch != LF)
+
+          self.nread = 0;
+
+          if (self.content_length == 0) {
+            self.flags.insert(.F_TRAILING)
+            UPDATE_STATE(.s_header_field_start)
+          } else {
+            UPDATE_STATE(.s_chunk_data)
+          }
+          
+          // CALLBACK_NOTIFY(chunk_header);
+          let len = CALLBACK_NOTIFY(onChunkHeader, &CURRENT_STATE, p, data)
+          if let len = len { return len } // error
+
+        case .s_chunk_data:
+          let to_read = min(self.content_length, ((data + len) - p))
+
+          assert(self.flags.contains(.F_CHUNKED))
+          assert(self.content_length != 0
+              && self.content_length != Int.max /* ULLONG_MAX */)
+
+          /* See the explanation in s_body_identity for why the content
+           * length and data pointers are managed this way.
+           */
+          if body_mark == nil { body_mark = p } // MARK(body);
+          self.content_length -= to_read;
+          p += to_read - 1;
+
+          if self.content_length == 0 {
+            UPDATE_STATE(.s_chunk_data_almost_done);
+          }
+        
+        case .s_chunk_data_almost_done:
+          assert(self.flags.contains(.F_CHUNKED))
+          assert(self.content_length == 0)
+          STRICT_CHECK(ch != CR)
+          UPDATE_STATE(.s_chunk_data_done);
+          
+          // CALLBACK_DATA(body);
+          let rc = CALLBACK_DATA_(onBody, &body_mark, &CURRENT_STATE,
+                                  p - body_mark + 1, p - data)
+          if let rc = rc { return rc }
+
+        case .s_chunk_data_done:
+          assert(self.flags.contains(.F_CHUNKED))
+          STRICT_CHECK(ch != LF);
+          self.nread = 0
+          UPDATE_STATE(.s_chunk_size_start);
+          
+          // CALLBACK_NOTIFY(chunk_complete);
+          let len = CALLBACK_NOTIFY(onChunkComplete, &CURRENT_STATE, p, data)
+          if let len = len { return len } // error
+
         default:
           assert(false) //  && "unhandled state");
           error = .INVALID_INTERNAL_STATE
@@ -1504,14 +1498,14 @@ public class HTTPParser {
        CALLBACK_DATA_NOADVANCE(status);
        
      // regular return
-       RETURN(len);
+       return RETURN(len);
     */
     // TODO
     
     /* TODO
      error:
        if error == .OK { error = .UNKNOWN }
-       RETURN(p - data);
+       return RETURN(p - data);
     */
     return 0
   }
@@ -1561,9 +1555,27 @@ public class HTTPParser {
     }
   }
   
-  var messageNeedsEOF : Bool {
-    // TODO: http_message_needs_eof
-    return false
+  var messageNeedsEOF : Bool { // http_message_needs_eof()
+    /* Does the parser need to see an EOF to find the end of the message? */
+    if type == .HTTP_REQUEST {
+      return false
+    }
+    
+    /* See RFC 2616 section 4.4 */
+    if status_code! / 100 == 1 || /* 1xx e.g. Continue */
+       status_code! == 204 ||     /* No Content */
+       status_code! == 304 ||     /* Not Modified */
+       flags.contains(.F_SKIPBODY) {     /* response to a HEAD request */
+      return false
+    }
+    
+    if (flags.contains(.F_CHUNKED)
+        || content_length != Int.max /* ULLONG_MAX */)
+    {
+      return false
+    }
+    
+    return true
   }
 
   /* Don't allow the total size of the HTTP headers (including the status

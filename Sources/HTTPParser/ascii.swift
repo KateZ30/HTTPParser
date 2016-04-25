@@ -8,21 +8,22 @@
 
 // Not in Swift: let c : CChar = 'A'
 
-let cTAB      : CChar = 9  // \t
-let cFORMFEED : CChar = 12 // \f
+let cTAB       : CChar = 9  // \t
+let cFORMFEED  : CChar = 12 // \f
 
-let cSPACE    : CChar = 32 //
-let cDASH     : CChar = 45 // -
-let cSLASH    : CChar = 47 // /
-let cCOLON    : CChar = 58 // :
-let cSTAR     : CChar = 42 // *
-let cAT       : CChar = 64 // @
-let cHASH     : CChar = 35 // #
-let cQM       : CChar = 63 // ?
-let cLSB      : CChar = 91 // [
-let cRSB      : CChar = 93 // ]
-let cDOT      : CChar = 46 // .
-let cCOMMA    : CChar = 44 // ,
+let cSPACE     : CChar = 32 //
+let cDASH      : CChar = 45 // -
+let cSLASH     : CChar = 47 // /
+let cCOLON     : CChar = 58 // :
+let cSTAR      : CChar = 42 // *
+let cAT        : CChar = 64 // @
+let cHASH      : CChar = 35 // #
+let cQM        : CChar = 63 // ?
+let cLSB       : CChar = 91 // [
+let cRSB       : CChar = 93 // ]
+let cDOT       : CChar = 46 // .
+let cCOMMA     : CChar = 44 // ,
+let cSEMICOLON : CChar = 59 // ;
 
 let cA : CChar = 65 // A
 let cB : CChar = 66
