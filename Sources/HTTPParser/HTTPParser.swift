@@ -428,13 +428,13 @@ public class HTTPParser {
         case .s_res_http_minor:
           if ch == 32 /* ' ' */ {
             UPDATE_STATE(.s_res_first_status_code);
-            break;
+            break
           }
           
           guard IS_NUM(ch) else { return gotoError(.INVALID_VERSION) }
           
           assert(self.http_minor != nil)
-          self.http_minor! *= Int16(10);
+          self.http_minor! *= Int16(10)
           self.http_minor! += Int16(ch - 48 /* '0' */)
           
           guard self.http_minor < 1000 else { return gotoError(.INVALID_VERSION) }
@@ -490,55 +490,54 @@ public class HTTPParser {
             break
           }
 
-        /*
-      case s_res_line_almost_done:
-        STRICT_CHECK(ch != LF);
-        UPDATE_STATE(s_header_field_start);
-        break;
+        case .s_res_line_almost_done:
+          STRICT_CHECK(ch != LF)
+          UPDATE_STATE(.s_header_field_start)
 
-      case s_start_req:
-      {
-        if (ch == CR || ch == LF)
+        case .s_start_req:
+          if ch == CR || ch == LF { break }
+
+          self.flags = HTTPParserOptions()
+          self.content_length = Int.max // was: ULLONG_MAX;
+          
+          guard IS_ALPHA(ch) else { return gotoError(.INVALID_METHOD) }
+          
+          self.method = nil
+          self.index  = 1;
+          switch ch {
+            case cA: self.method = .ACL
+            case cB: self.method = .BIND
+            case cC: self.method = .CONNECT /* or COPY, CHECKOUT */
+            case cD: self.method = .DELETE
+            case cG: self.method = .GET
+            case cH: self.method = .HEAD
+            case cL: self.method = .LOCK /* or LINK */
+            case cM: self.method = .MKCOL
+               /* or MOVE, MKACTIVITY, MERGE, M-SEARCH, MKCALENDAR */
+            case cN: self.method = .NOTIFY
+            case cO: self.method = .OPTIONS
+            case cP: self.method = .POST
+              /* or PROPFIND|PROPPATCH|PUT|PATCH|PURGE */
+
+            case cR: self.method = .REPORT((nil, nil)) /* or REBIND */
+            case cS: self.method = .SUBSCRIBE /* or SEARCH */
+            case cT: self.method = .TRACE
+            case cU: self.method = .UNLOCK
+              /* or UNSUBSCRIBE, UNBIND, UNLINK */
+            default:
+              return gotoError(.INVALID_METHOD)
+          }
+          UPDATE_STATE(.s_req_method);
+          
+          // CALLBACK_NOTIFY(message_begin);
+          let ( newState, len ) =
+            CALLBACK_NOTIFY(onMessageBegin, CURRENT_STATE, p, data)
+          if let len = len { return len } // error
+          CURRENT_STATE = newState
+
           break;
-        parser->flags = 0;
-        parser->content_length = ULLONG_MAX;
 
-        if (UNLIKELY(!IS_ALPHA(ch))) {
-          SET_ERRNO(HPE_INVALID_METHOD);
-          goto error;
-        }
-
-        parser->method = (enum http_method) 0;
-        parser->index = 1;
-        switch (ch) {
-          case 'A': parser->method = HTTP_ACL; break;
-          case 'B': parser->method = HTTP_BIND; break;
-          case 'C': parser->method = HTTP_CONNECT; /* or COPY, CHECKOUT */ break;
-          case 'D': parser->method = HTTP_DELETE; break;
-          case 'G': parser->method = HTTP_GET; break;
-          case 'H': parser->method = HTTP_HEAD; break;
-          case 'L': parser->method = HTTP_LOCK; /* or LINK */ break;
-          case 'M': parser->method = HTTP_MKCOL; /* or MOVE, MKACTIVITY, MERGE, M-SEARCH, MKCALENDAR */ break;
-          case 'N': parser->method = HTTP_NOTIFY; break;
-          case 'O': parser->method = HTTP_OPTIONS; break;
-          case 'P': parser->method = HTTP_POST;
-            /* or PROPFIND|PROPPATCH|PUT|PATCH|PURGE */
-            break;
-          case 'R': parser->method = HTTP_REPORT; /* or REBIND */ break;
-          case 'S': parser->method = HTTP_SUBSCRIBE; /* or SEARCH */ break;
-          case 'T': parser->method = HTTP_TRACE; break;
-          case 'U': parser->method = HTTP_UNLOCK; /* or UNSUBSCRIBE, UNBIND, UNLINK */ break;
-          default:
-            SET_ERRNO(HPE_INVALID_METHOD);
-            goto error;
-        }
-        UPDATE_STATE(s_req_method);
-
-        CALLBACK_NOTIFY(message_begin);
-
-        break;
-      }
-
+        /*
       case s_req_method:
       {
         const char *matcher;
