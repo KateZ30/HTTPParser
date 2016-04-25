@@ -21,6 +21,27 @@ class HTTPParserTests: XCTestCase {
     let parser = HTTPParser(type: .HTTP_REQUEST)
     XCTAssertNotNil(parser)
     
+    parser.onMessageBegin = { p in
+      print("message begin")
+      return 1
+    }
+    parser.onHeaderField = { p, ptr, len in
+      print("header field")
+      return 1
+    }
+    parser.onBody = { p, ptr, len in
+      print("body")
+      return 1
+    }
+    parser.onStatus = { p, ptr, len in
+      print("status")
+      return 1
+    }
+    parser.onURL = { p, ptr, len in
+      print("url")
+      return 1
+    }
+    
     simpleGetRequest.withCString { cstr in
       let len = size_t(strlen(cstr))
       let nb  = parser.execute(cstr, len)
