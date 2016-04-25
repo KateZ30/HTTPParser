@@ -173,7 +173,7 @@ public class HTTPParser {
   
   /// Executes the parser. Returns number of parsed bytes. Sets
   /// `error` on error.
-  public func execute(data: UnsafePointer<CChar>, len: size_t) -> size_t {
+  public func execute(data: UnsafePointer<CChar>, _ len: size_t) -> size_t {
     /* We're in an error state. Don't bother doing anything. */
     guard error != .OK else { return 0 }
     

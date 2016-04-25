@@ -10,27 +10,27 @@ import XCTest
 @testable import HTTPParser
 
 class HTTPParserTests: XCTestCase {
+  
+  let simpleGetRequest =
+    "GET /index.html HTTP/1.1\r\n" +
+    "Content-length: 0\r\n" +
+    "Content-type: text/plain\r\n" +
+    "\r\n";
+
+  func testSimpleGetRequest() {
+    let parser = HTTPParser(type: .HTTP_REQUEST)
+    XCTAssertNotNil(parser)
     
-    override func setUp() {
-        super.setUp()
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+    simpleGetRequest.withCString { cstr in
+      let len = size_t(strlen(cstr))
+      let nb  = parser.execute(cstr, len)
+      
+      XCTAssertEqual(len, nb)
     }
     
-    override func tearDown() {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-        super.tearDown()
-    }
-    
-    func testExample() {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-    }
-    
-    func testPerformanceExample() {
-        // This is an example of a performance test case.
-        self.measureBlock {
-            // Put the code you want to measure the time of here.
-        }
-    }
-    
+    // send EOF
+    let nb  = parser.execute(nil, 0)
+    XCTAssertEqual(nb, 0)
+  }
+  
 }
