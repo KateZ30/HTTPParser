@@ -627,184 +627,125 @@ public class HTTPParser {
           if (CURRENT_STATE == .s_dead) { return gotoError(.INVALID_URL) }
 
 
+        case .s_req_schema:             fallthrough
+        case .s_req_schema_slash:       fallthrough
+        case .s_req_schema_slash_slash: fallthrough
+        case .s_req_server_start:
+          switch ch {
+            /* No whitespace allowed here */
+            case cSPACE: fallthrough
+            case CR:     fallthrough
+            case LF:     return gotoError(.INVALID_URL)
+            default:
+              UPDATE_STATE(parse_url_char(CURRENT_STATE, ch))
+              if CURRENT_STATE == .s_dead { return gotoError(.INVALID_URL) }
+          }
+
+      case .s_req_server:             fallthrough
+      case .s_req_server_with_at:     fallthrough
+      case .s_req_path:               fallthrough
+      case .s_req_query_string_start: fallthrough
+      case .s_req_query_string:       fallthrough
+      case .s_req_fragment_start:     fallthrough
+      case .s_req_fragment:
+        switch ch {
+          case cSPACE:
+            UPDATE_STATE(.s_req_http_start)
+            //CALLBACK_DATA(url);
+            let rc = CALLBACK_DATA(onURL, &url_mark, &CURRENT_STATE, p, data)
+            if let rc = rc { return rc } // error
+          
+          case CR: fallthrough
+          case LF:
+            self.http_major = 0
+            self.http_minor = 9
+            UPDATE_STATE(ch == CR
+                         ? .s_req_line_almost_done
+                         : .s_header_field_start)
+            // CALLBACK_DATA(url)
+            let rc = CALLBACK_DATA(onURL, &url_mark, &CURRENT_STATE, p, data)
+            if let rc = rc { return rc } // error
+
+          default:
+            UPDATE_STATE(parse_url_char(CURRENT_STATE, ch))
+            if CURRENT_STATE == .s_dead { return gotoError(.INVALID_URL) }
+        }
+
+        case .s_req_http_start:
+          switch ch {
+            case cH:     UPDATE_STATE(.s_req_http_H);
+            case cSPACE: break;
+            default:     return gotoError(.INVALID_CONSTANT)
+          }
+        
+        case .s_req_http_H:
+          STRICT_CHECK(ch != cT)
+          UPDATE_STATE(.s_req_http_HT)
+
+        case .s_req_http_HT:
+          STRICT_CHECK(ch != cT)
+          UPDATE_STATE(.s_req_http_HTT)
+
+        case .s_req_http_HTT:
+          STRICT_CHECK(ch != cP)
+          UPDATE_STATE(.s_req_http_HTTP)
+
+        case .s_req_http_HTTP:
+          STRICT_CHECK(ch != cSLASH)
+          UPDATE_STATE(.s_req_first_http_major)
+
+        /* first digit of major HTTP version */
+        case .s_req_first_http_major:
+          if ch < c1 || ch > c9 { return gotoError(.INVALID_VERSION) }
+
+          self.http_major = Int16(ch - c0)
+          UPDATE_STATE(.s_req_http_major)
+
+        /* major HTTP version or dot */
+        case .s_req_http_major:
+          if ch == cDOT {
+            UPDATE_STATE(.s_req_first_http_minor)
+            break;
+          }
+          guard IS_NUM(ch) else { return gotoError(.INVALID_VERSION) }
+          
+          assert(self.http_major != nil)
+          self.http_major! *= 10;
+          self.http_major! += Int16(ch - c0);
+          
+          guard self.http_major < 1000 else {
+            return gotoError(.INVALID_VERSION)
+          }
+
+        /* first digit of minor HTTP version */
+        case .s_req_first_http_minor:
+          guard IS_NUM(ch) else { return gotoError(.INVALID_VERSION) }
+          self.http_minor = Int16(ch - c0)
+          UPDATE_STATE(.s_req_http_minor)
+
+        /* minor HTTP version or end of request line */
+        case .s_req_http_minor:
+          if ch == CR { UPDATE_STATE(.s_req_line_almost_done); break }
+          if ch == LF { UPDATE_STATE(.s_header_field_start);   break }
+
+          /* XXX allow spaces after digit? */
+          
+          guard IS_NUM(ch) else { return gotoError(.INVALID_VERSION) }
+
+          assert(self.http_minor != nil)
+          self.http_minor! *= 10
+          self.http_minor! += ch - c0
+
+          guard self.http_minor < 1000 else {
+            return gotoError(.INVALID_VERSION)
+          }
+
+        /* end of request line */
+        case .s_req_line_almost_done:
+          guard ch == LF else { return gotoError(.LF_EXPECTED) }
+          UPDATE_STATE(.s_header_field_start);
+
         /*
-      case s_req_schema:
-      case s_req_schema_slash:
-      case s_req_schema_slash_slash:
-      case s_req_server_start:
-      {
-        switch (ch) {
-          /* No whitespace allowed here */
-          case ' ':
-          case CR:
-          case LF:
-            SET_ERRNO(HPE_INVALID_URL);
-            goto error;
-          default:
-            UPDATE_STATE(parse_url_char(CURRENT_STATE(), ch));
-            if (UNLIKELY(CURRENT_STATE() == s_dead)) {
-              SET_ERRNO(HPE_INVALID_URL);
-              goto error;
-            }
-        }
-
-        break;
-      }
-
-      case s_req_server:
-      case s_req_server_with_at:
-      case s_req_path:
-      case s_req_query_string_start:
-      case s_req_query_string:
-      case s_req_fragment_start:
-      case s_req_fragment:
-      {
-        switch (ch) {
-          case ' ':
-            UPDATE_STATE(s_req_http_start);
-            CALLBACK_DATA(url);
-            break;
-          case CR:
-          case LF:
-            parser->http_major = 0;
-            parser->http_minor = 9;
-            UPDATE_STATE((ch == CR) ?
-              s_req_line_almost_done :
-              s_header_field_start);
-            CALLBACK_DATA(url);
-            break;
-          default:
-            UPDATE_STATE(parse_url_char(CURRENT_STATE(), ch));
-            if (UNLIKELY(CURRENT_STATE() == s_dead)) {
-              SET_ERRNO(HPE_INVALID_URL);
-              goto error;
-            }
-        }
-        break;
-      }
-
-      case s_req_http_start:
-        switch (ch) {
-          case 'H':
-            UPDATE_STATE(s_req_http_H);
-            break;
-          case ' ':
-            break;
-          default:
-            SET_ERRNO(HPE_INVALID_CONSTANT);
-            goto error;
-        }
-        break;
-
-      case s_req_http_H:
-        STRICT_CHECK(ch != 'T');
-        UPDATE_STATE(s_req_http_HT);
-        break;
-
-      case s_req_http_HT:
-        STRICT_CHECK(ch != 'T');
-        UPDATE_STATE(s_req_http_HTT);
-        break;
-
-      case s_req_http_HTT:
-        STRICT_CHECK(ch != 'P');
-        UPDATE_STATE(s_req_http_HTTP);
-        break;
-
-      case s_req_http_HTTP:
-        STRICT_CHECK(ch != '/');
-        UPDATE_STATE(s_req_first_http_major);
-        break;
-
-      /* first digit of major HTTP version */
-      case s_req_first_http_major:
-        if (UNLIKELY(ch < '1' || ch > '9')) {
-          SET_ERRNO(HPE_INVALID_VERSION);
-          goto error;
-        }
-
-        parser->http_major = ch - '0';
-        UPDATE_STATE(s_req_http_major);
-        break;
-
-      /* major HTTP version or dot */
-      case s_req_http_major:
-      {
-        if (ch == '.') {
-          UPDATE_STATE(s_req_first_http_minor);
-          break;
-        }
-
-        if (UNLIKELY(!IS_NUM(ch))) {
-          SET_ERRNO(HPE_INVALID_VERSION);
-          goto error;
-        }
-
-        parser->http_major *= 10;
-        parser->http_major += ch - '0';
-
-        if (UNLIKELY(parser->http_major > 999)) {
-          SET_ERRNO(HPE_INVALID_VERSION);
-          goto error;
-        }
-
-        break;
-      }
-
-      /* first digit of minor HTTP version */
-      case s_req_first_http_minor:
-        if (UNLIKELY(!IS_NUM(ch))) {
-          SET_ERRNO(HPE_INVALID_VERSION);
-          goto error;
-        }
-
-        parser->http_minor = ch - '0';
-        UPDATE_STATE(s_req_http_minor);
-        break;
-
-      /* minor HTTP version or end of request line */
-      case s_req_http_minor:
-      {
-        if (ch == CR) {
-          UPDATE_STATE(s_req_line_almost_done);
-          break;
-        }
-
-        if (ch == LF) {
-          UPDATE_STATE(s_header_field_start);
-          break;
-        }
-
-        /* XXX allow spaces after digit? */
-
-        if (UNLIKELY(!IS_NUM(ch))) {
-          SET_ERRNO(HPE_INVALID_VERSION);
-          goto error;
-        }
-
-        parser->http_minor *= 10;
-        parser->http_minor += ch - '0';
-
-        if (UNLIKELY(parser->http_minor > 999)) {
-          SET_ERRNO(HPE_INVALID_VERSION);
-          goto error;
-        }
-
-        break;
-      }
-
-      /* end of request line */
-      case s_req_line_almost_done:
-      {
-        if (UNLIKELY(ch != LF)) {
-          SET_ERRNO(HPE_LF_EXPECTED);
-          goto error;
-        }
-
-        UPDATE_STATE(s_header_field_start);
-        break;
-      }
-
       case s_header_field_start:
       {
         if (ch == CR) {
