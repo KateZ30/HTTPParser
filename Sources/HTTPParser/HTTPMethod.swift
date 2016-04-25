@@ -29,6 +29,8 @@ public enum HTTPMethod : Equatable {
   
   case PATCH, PURGE
   
+  case ACL, BIND, UNBIND
+  
   case Extension(String)
 
 
@@ -72,6 +74,10 @@ public enum HTTPMethod : Equatable {
       
       case "PATCH":       self = .PATCH
       case "PURGE":       self = .PURGE
+      
+      case "ACL":         self = .ACL
+      case "BIND":        self = .BIND
+      case "UNBIND":      self = .UNBIND
       
       default:            self = .Extension(string)
     }
@@ -121,6 +127,10 @@ public extension HTTPMethod {
 
       case .PATCH:      return "PATCH"
       case .PURGE:      return "PURGE"
+      
+      case .ACL:        return "ACL"
+      case .BIND:       return "BIND"
+      case .UNBIND:     return "UNBIND"
       
       case .Extension(let v):
         return v
