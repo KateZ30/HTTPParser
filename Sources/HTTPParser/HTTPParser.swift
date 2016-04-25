@@ -1484,30 +1484,40 @@ public class HTTPParser {
      * we'd otherwise have (since CALLBACK_DATA() is meant to be run with a 'p'
      * value that's in-bounds).
      */
-    /* TODO:
-       assert(((header_field_mark ? 1 : 0) +
-       (header_value_mark ? 1 : 0) +
-       (url_mark ? 1 : 0)  +
-       (body_mark ? 1 : 0) +
-       (status_mark ? 1 : 0)) <= 1);
-       
-       CALLBACK_DATA_NOADVANCE(header_field);
-       CALLBACK_DATA_NOADVANCE(header_value);
-       CALLBACK_DATA_NOADVANCE(url);
-       CALLBACK_DATA_NOADVANCE(body);
-       CALLBACK_DATA_NOADVANCE(status);
-       
-     // regular return
-       return RETURN(len);
+
+    /* this seems to hang swiftc 2.2
+     assert(((header_field_mark != nil ? 1 : 0) +
+             (header_value_mark != nil ? 1 : 0) +
+             (url_mark          != nil ? 1 : 0) +
+             (body_mark         != nil ? 1 : 0) +
+             (status_mark       != nil ? 1 : 0)) <= 1);
     */
-    // TODO
+     var rc = CALLBACK_DATA_NOADVANCE(onHeaderField, &header_field_mark,
+                                      &CURRENT_STATE, p, data)
+     if let rc1 = rc { return rc1 } // error
     
-    /* TODO
+     rc = CALLBACK_DATA_NOADVANCE(onHeaderValue, &header_value_mark,
+                                  &CURRENT_STATE, p, data)
+     if let rc2 = rc { return rc2 } // error
+    
+     rc = CALLBACK_DATA_NOADVANCE(onURL, &url_mark, &CURRENT_STATE, p, data)
+     if let rc3 = rc { return rc3 } // error
+    
+     rc = CALLBACK_DATA_NOADVANCE(onBody, &body_mark, &CURRENT_STATE, p, data)
+     if let rc4 = rc { return rc4 } // error
+    
+     rc = CALLBACK_DATA_NOADVANCE(onStatus, &status_mark, &CURRENT_STATE,
+                                  p, data)
+     if let rc5 = rc { return rc5 } // error
+ 
+     // regular return
+     return RETURN(len)
+
+    /* This goto is translated to gotoError()
      error:
        if error == .OK { error = .UNKNOWN }
        return RETURN(p - data);
     */
-    return 0
   }
  
   public func pause() {
