@@ -775,379 +775,352 @@ public class HTTPParser {
             default: self.header_state = .h_general
           }
 
-      case .s_header_field:
-        let start = p
-        while p != (data + len) {
-          ch = p.memory
-          let c = TOKEN(ch)
-          if c == 0 { break }
+        case .s_header_field:
+          let start = p
+          while p != (data + len) {
+            ch = p.memory
+            let c = TOKEN(ch)
+            if c == 0 { break }
+
+            switch self.header_state {
+              case .h_general: break
+
+              case .h_C:
+                self.index += 1
+                self.header_state = (c == co ? .h_CO : .h_general)
+
+              case .h_CO:
+                self.index += 1
+                self.header_state = (c == cn ? .h_CON : .h_general)
+
+              case .h_CON:
+                self.index += 1
+                switch c {
+                  case cn: self.header_state = .h_matching_connection
+                  case ct: self.header_state = .h_matching_content_length
+                  default: self.header_state = .h_general
+                }
+
+              /* connection */
+
+              case .h_matching_connection:
+                self.index += 1
+                if self.index > lCONNECTION || c != CONNECTION[self.index] {
+                  self.header_state = .h_general;
+                } else if self.index == lCONNECTION - 1 {
+                  self.header_state = .h_connection;
+                }
+                break;
+
+              /* proxy-connection */
+
+              case .h_matching_proxy_connection:
+                self.index += 1
+                if (self.index > lPROXY_CONNECTION
+                    || c != PROXY_CONNECTION[self.index]) {
+                  self.header_state = .h_general;
+                } else if self.index == lPROXY_CONNECTION-1 {
+                  self.header_state = .h_connection;
+                }
+
+              /* content-length */
+
+              case .h_matching_content_length:
+                self.index += 1
+                if (self.index > lCONTENT_LENGTH
+                    || c != CONTENT_LENGTH[self.index]) {
+                  self.header_state = .h_general;
+                } else if self.index == lCONTENT_LENGTH-1 {
+                  self.header_state = .h_content_length;
+                }
+
+              /* transfer-encoding */
+
+              case .h_matching_transfer_encoding:
+                self.index += 1
+                if (self.index > lTRANSFER_ENCODING
+                    || c != TRANSFER_ENCODING[self.index]) {
+                  self.header_state = .h_general;
+                } else if self.index == lTRANSFER_ENCODING-1 {
+                  self.header_state = .h_transfer_encoding;
+                }
+
+              /* upgrade */
+
+              case .h_matching_upgrade:
+                self.index += 1
+                
+                if self.index > lUPGRADE || c != UPGRADE[self.index] {
+                  self.header_state = .h_general;
+                } else if self.index == lUPGRADE-1 {
+                  self.header_state = .h_upgrade;
+                }
+
+              case .h_connection:        fallthrough
+              case .h_content_length:    fallthrough
+              case .h_transfer_encoding: fallthrough
+              case .h_upgrade:
+                if ch != cSPACE { self.header_state = .h_general }
+
+              default:
+                assert(false, "Unknown header_state")
+            }
+            
+            p += 1
+          }
+
+          COUNT_HEADER_SIZE(p - start)
+
+          if p == data + len {
+            p -= 1
+            break
+          }
+
+          if ch == cCOLON {
+            UPDATE_STATE(.s_header_value_discard_ws);
+            
+            // CALLBACK_DATA(header_field);
+            let rc = CALLBACK_DATA(onHeaderField, &header_field_mark,
+                                   &CURRENT_STATE, p, data)
+            if let rc = rc { return rc } // error
+            break
+          }
+
+          return gotoError(.INVALID_HEADER_TOKEN)
+
+        case .s_header_value_discard_ws:
+          if ch == cSPACE || ch == cTAB { break }
+          
+          if ch == CR {
+            UPDATE_STATE(.s_header_value_discard_ws_almost_done)
+            break
+          }
+          if ch == LF { UPDATE_STATE(.s_header_value_discard_lws); break }
+
+          /* FALLTHROUGH */
+          fallthrough
+
+        case .s_header_value_start:
+          // MARK(header_value);
+          if header_value_mark == nil { header_value_mark = p }
+          
+          UPDATE_STATE(.s_header_value)
+          self.index = 0
+
+          let c = LOWER(ch)
 
           switch self.header_state {
-            case .h_general: break
-
-            case .h_C:
-              self.index += 1
-              self.header_state = (c == co ? .h_CO : .h_general)
-
-            case .h_CO:
-              self.index += 1
-              self.header_state = (c == cn ? .h_CON : .h_general)
-
-            case .h_CON:
-              self.index += 1
-              switch c {
-                case cn: self.header_state = .h_matching_connection
-                case ct: self.header_state = .h_matching_content_length
-                default: self.header_state = .h_general
-              }
-
-            /* connection */
-
-            case .h_matching_connection:
-              self.index += 1
-              if self.index > lCONNECTION || c != CONNECTION[self.index] {
-                self.header_state = .h_general;
-              } else if self.index == lCONNECTION - 1 {
-                self.header_state = .h_connection;
-              }
-              break;
-
-            /* proxy-connection */
-
-            case .h_matching_proxy_connection:
-              self.index += 1
-              if (self.index > lPROXY_CONNECTION
-                  || c != PROXY_CONNECTION[self.index]) {
-                self.header_state = .h_general;
-              } else if self.index == lPROXY_CONNECTION-1 {
-                self.header_state = .h_connection;
-              }
-
-            /* content-length */
-
-            case .h_matching_content_length:
-              self.index += 1
-              if (self.index > lCONTENT_LENGTH
-                  || c != CONTENT_LENGTH[self.index]) {
-                self.header_state = .h_general;
-              } else if self.index == lCONTENT_LENGTH-1 {
-                self.header_state = .h_content_length;
-              }
-
-            /* transfer-encoding */
-
-            case .h_matching_transfer_encoding:
-              self.index += 1
-              if (self.index > lTRANSFER_ENCODING
-                  || c != TRANSFER_ENCODING[self.index]) {
-                self.header_state = .h_general;
-              } else if self.index == lTRANSFER_ENCODING-1 {
-                self.header_state = .h_transfer_encoding;
-              }
-
-            /* upgrade */
-
-            case .h_matching_upgrade:
-              self.index += 1
-              
-              if self.index > lUPGRADE || c != UPGRADE[self.index] {
-                self.header_state = .h_general;
-              } else if self.index == lUPGRADE-1 {
-                self.header_state = .h_upgrade;
-              }
-
-            case .h_connection:        fallthrough
-            case .h_content_length:    fallthrough
-            case .h_transfer_encoding: fallthrough
             case .h_upgrade:
-              if ch != cSPACE { self.header_state = .h_general }
+              self.flags.insert(.F_UPGRADE)
+              self.header_state = .h_general;
 
-            default:
-              assert(false, "Unknown header_state")
+            case .h_transfer_encoding:
+              /* looking for 'Transfer-Encoding: chunked' */
+              if (cc == c) {
+                self.header_state = .h_matching_transfer_encoding_chunked
+              } else {
+                self.header_state = .h_general
+              }
+
+            case .h_content_length:
+              guard IS_NUM(ch) else { return gotoError(.INVALID_CONTENT_LENGTH)}
+              self.content_length = ch - c0;
+
+            case .h_connection:
+              /* looking for 'Connection: keep-alive' */
+              if (c == ck) {
+                self.header_state = .h_matching_connection_keep_alive;
+              /* looking for 'Connection: close' */
+              } else if (c == cc) {
+                self.header_state = .h_matching_connection_close;
+              } else if (c == cu) {
+                self.header_state = .h_matching_connection_upgrade;
+              } else {
+                self.header_state = .h_matching_connection_token;
+              }
+
+            /* Multi-value `Connection` header */
+            case .h_matching_connection_token_start: break
+
+            default: self.header_state = .h_general; break
           }
+
+        case .s_header_value:
+          let start   = p
+          var h_state = self.header_state
           
-          p += 1
-        }
+          while p != data + len {
+            ch = p.memory
+            
+            if (ch == CR) {
+              UPDATE_STATE(.s_header_almost_done);
+              self.header_state = h_state;
+              // CALLBACK_DATA(header_value);
+              let rc = CALLBACK_DATA(onHeaderValue, &header_value_mark,
+                                     &CURRENT_STATE, p, data)
+              if let rc = rc { return rc } // error
+              break;
+            }
 
-        COUNT_HEADER_SIZE(p - start)
+            if (ch == LF) {
+              UPDATE_STATE(.s_header_almost_done);
+              COUNT_HEADER_SIZE(p - start);
+              self.header_state = h_state;
+              // CALLBACK_DATA_NOADVANCE(header_value);
+              let rc = CALLBACK_DATA_NOADVANCE(onHeaderValue,
+                                               &header_value_mark,
+                                               &CURRENT_STATE, p, data)
+              if let rc = rc { return rc } // error
+              
+              if let len = gotoReexecute() { return len } // error?
+            }
 
-        if p == data + len {
-          p -= 1
-          break
-        }
+            let c = LOWER(ch)
 
-        if ch == cCOLON {
-          UPDATE_STATE(.s_header_value_discard_ws);
-          
-          // CALLBACK_DATA(header_field);
-          let rc = CALLBACK_DATA(onHeaderField, &header_field_mark,
-                                 &CURRENT_STATE, p, data)
-          if let rc = rc { return rc } // error
-          break
-        }
+            switch h_state {
+              case .h_general:
+                var limit : size_t = data + len - p;
 
-        return gotoError(.INVALID_HEADER_TOKEN)
+                limit = min(limit, HTTP_MAX_HEADER_SIZE);
+
+                // p_cr = (const char*) memchr(p, CR, limit);
+                // p_lf = (const char*) memchr(p, LF, limit);
+                let p_cr = UnsafePointer<CChar>(memchr(p, Int32(CR), limit))
+                let p_lf = UnsafePointer<CChar>(memchr(p, Int32(LF), limit))
+                if p_cr != nil {
+                  if p_lf != nil && p_cr >= p_lf {
+                    p = p_lf
+                  } else {
+                    p = p_cr
+                  }
+                } else if p_lf != nil {
+                  p = p_lf
+                } else {
+                  p = data + len;
+                }
+                p -= 1
+
+              case .h_connection: fallthrough
+              case .h_transfer_encoding:
+                assert(false, "Shouldn't get here.")
+
+              case .h_content_length:
+                if ch == cSPACE { break }
+
+                guard IS_NUM(ch) else {
+                  self.header_state = h_state;
+                  return gotoError(.INVALID_CONTENT_LENGTH)
+                }
+
+                var t = Int(self.content_length)
+                t *= 10
+                t += Int(ch - c0)
+
+                /* Overflow? Test against a conservative limit for simplicity. */
+                // HH: was ULLONG_MAX
+                if (Int.max - 10) / 10 < self.content_length {
+                  self.header_state = h_state;
+                  return gotoError(.INVALID_CONTENT_LENGTH)
+                }
+
+                self.content_length = Int(t)
+
+              /* Transfer-Encoding: chunked */
+              case .h_matching_transfer_encoding_chunked:
+                self.index += 1
+                if self.index > lCHUNKED || c != CHUNKED[self.index] {
+                  h_state = .h_general
+                } else if self.index == lCHUNKED-1 {
+                  h_state = .h_transfer_encoding_chunked
+                }
+
+              case .h_matching_connection_token_start:
+                /* looking for 'Connection: keep-alive' */
+                if c == ck {
+                  h_state = .h_matching_connection_keep_alive
+                /* looking for 'Connection: close' */
+                } else if c == cc {
+                  h_state = .h_matching_connection_close
+                } else if c == cu {
+                  h_state = .h_matching_connection_upgrade
+                } else if STRICT_TOKEN(c) != 0 {
+                  h_state = .h_matching_connection_token
+                } else if c == cSPACE || c == cTAB {
+                  /* Skip lws */
+                } else {
+                  h_state = .h_general
+                }
+
+              /* looking for 'Connection: keep-alive' */
+              case .h_matching_connection_keep_alive:
+                self.index += 1;
+                if self.index > lKEEP_ALIVE || c != KEEP_ALIVE[self.index] {
+                  h_state = .h_matching_connection_token
+                } else if self.index == lKEEP_ALIVE-1 {
+                  h_state = .h_connection_keep_alive
+                }
+
+              /* looking for 'Connection: close' */
+              case .h_matching_connection_close:
+                self.index += 1
+                if self.index > lCLOSE || c != CLOSE[self.index] {
+                  h_state = .h_matching_connection_token
+                } else if self.index == lCLOSE-1 {
+                  h_state = .h_connection_close
+                }
+
+              /* looking for 'Connection: upgrade' */
+              case .h_matching_connection_upgrade:
+                self.index += 1
+                if self.index > lUPGRADE || c != UPGRADE[self.index] {
+                  h_state = .h_matching_connection_token
+                } else if self.index == lUPGRADE-1 {
+                  h_state = .h_connection_upgrade
+                }
+
+              case .h_matching_connection_token:
+                if ch == cCOMMA {
+                  h_state = .h_matching_connection_token_start
+                  self.index = 0
+                }
+
+              case .h_transfer_encoding_chunked:
+                if ch != cSPACE { h_state = .h_general }
+                break;
+
+              case .h_connection_keep_alive: fallthrough
+              case .h_connection_close:      fallthrough
+              case .h_connection_upgrade:
+                if ch == cCOMMA {
+                  if h_state == .h_connection_keep_alive {
+                    self.flags.insert(.F_CONNECTION_KEEP_ALIVE)
+                  } else if h_state == .h_connection_close {
+                    self.flags.insert(.F_CONNECTION_CLOSE)
+                  } else if h_state == .h_connection_upgrade {
+                    self.flags.insert(.F_CONNECTION_UPGRADE)
+                  }
+                  h_state = .h_matching_connection_token_start
+                  self.index = 0;
+                } else if ch != cSPACE {
+                  h_state = .h_matching_connection_token
+                }
+
+              default:
+                UPDATE_STATE(.s_header_value)
+                h_state = .h_general
+            }
+            
+            p += 1
+          }
+          self.header_state = h_state;
+
+          COUNT_HEADER_SIZE(p - start);
+
+          if (p == data + len) {
+            p -= 1
+          }
 
         /*
-
-      case s_header_value_discard_ws:
-        if (ch == ' ' || ch == '\t') break;
-
-        if (ch == CR) {
-          UPDATE_STATE(s_header_value_discard_ws_almost_done);
-          break;
-        }
-
-        if (ch == LF) {
-          UPDATE_STATE(s_header_value_discard_lws);
-          break;
-        }
-
-        /* FALLTHROUGH */
-
-      case s_header_value_start:
-      {
-        MARK(header_value);
-
-        UPDATE_STATE(s_header_value);
-        self.index = 0;
-
-        c = LOWER(ch);
-
-        switch (self.header_state) {
-          case h_upgrade:
-            parser->flags |= F_UPGRADE;
-            self.header_state = h_general;
-            break;
-
-          case h_transfer_encoding:
-            /* looking for 'Transfer-Encoding: chunked' */
-            if ('c' == c) {
-              self.header_state = h_matching_transfer_encoding_chunked;
-            } else {
-              self.header_state = h_general;
-            }
-            break;
-
-          case h_content_length:
-            if (UNLIKELY(!IS_NUM(ch))) {
-              SET_ERRNO(HPE_INVALID_CONTENT_LENGTH);
-              goto error;
-            }
-
-            parser->content_length = ch - '0';
-            break;
-
-          case h_connection:
-            /* looking for 'Connection: keep-alive' */
-            if (c == 'k') {
-              self.header_state = h_matching_connection_keep_alive;
-            /* looking for 'Connection: close' */
-            } else if (c == 'c') {
-              self.header_state = h_matching_connection_close;
-            } else if (c == 'u') {
-              self.header_state = h_matching_connection_upgrade;
-            } else {
-              self.header_state = h_matching_connection_token;
-            }
-            break;
-
-          /* Multi-value `Connection` header */
-          case h_matching_connection_token_start:
-            break;
-
-          default:
-            self.header_state = h_general;
-            break;
-        }
-        break;
-      }
-
-      case s_header_value:
-      {
-        const char* start = p;
-        enum header_states h_state = (enum header_states) self.header_state;
-        for (; p != data + len; p++) {
-          ch = *p;
-          if (ch == CR) {
-            UPDATE_STATE(s_header_almost_done);
-            self.header_state = h_state;
-            CALLBACK_DATA(header_value);
-            break;
-          }
-
-          if (ch == LF) {
-            UPDATE_STATE(s_header_almost_done);
-            COUNT_HEADER_SIZE(p - start);
-            self.header_state = h_state;
-            CALLBACK_DATA_NOADVANCE(header_value);
-            REEXECUTE();
-          }
-
-          c = LOWER(ch);
-
-          switch (h_state) {
-            case h_general:
-            {
-              const char* p_cr;
-              const char* p_lf;
-              size_t limit = data + len - p;
-
-              limit = MIN(limit, HTTP_MAX_HEADER_SIZE);
-
-              p_cr = (const char*) memchr(p, CR, limit);
-              p_lf = (const char*) memchr(p, LF, limit);
-              if (p_cr != NULL) {
-                if (p_lf != NULL && p_cr >= p_lf)
-                  p = p_lf;
-                else
-                  p = p_cr;
-              } else if (UNLIKELY(p_lf != NULL)) {
-                p = p_lf;
-              } else {
-                p = data + len;
-              }
-              --p;
-
-              break;
-            }
-
-            case h_connection:
-            case h_transfer_encoding:
-              assert(0 && "Shouldn't get here.");
-              break;
-
-            case h_content_length:
-            {
-              uint64_t t;
-
-              if (ch == ' ') break;
-
-              if (UNLIKELY(!IS_NUM(ch))) {
-                SET_ERRNO(HPE_INVALID_CONTENT_LENGTH);
-                self.header_state = h_state;
-                goto error;
-              }
-
-              t = parser->content_length;
-              t *= 10;
-              t += ch - '0';
-
-              /* Overflow? Test against a conservative limit for simplicity. */
-              if (UNLIKELY((ULLONG_MAX - 10) / 10 < parser->content_length)) {
-                SET_ERRNO(HPE_INVALID_CONTENT_LENGTH);
-                self.header_state = h_state;
-                goto error;
-              }
-
-              parser->content_length = t;
-              break;
-            }
-
-            /* Transfer-Encoding: chunked */
-            case h_matching_transfer_encoding_chunked:
-              self.index++;
-              if (self.index > sizeof(CHUNKED)-1
-                  || c != CHUNKED[self.index]) {
-                h_state = h_general;
-              } else if (self.index == sizeof(CHUNKED)-2) {
-                h_state = h_transfer_encoding_chunked;
-              }
-              break;
-
-            case h_matching_connection_token_start:
-              /* looking for 'Connection: keep-alive' */
-              if (c == 'k') {
-                h_state = h_matching_connection_keep_alive;
-              /* looking for 'Connection: close' */
-              } else if (c == 'c') {
-                h_state = h_matching_connection_close;
-              } else if (c == 'u') {
-                h_state = h_matching_connection_upgrade;
-              } else if (STRICT_TOKEN(c)) {
-                h_state = h_matching_connection_token;
-              } else if (c == ' ' || c == '\t') {
-                /* Skip lws */
-              } else {
-                h_state = h_general;
-              }
-              break;
-
-            /* looking for 'Connection: keep-alive' */
-            case h_matching_connection_keep_alive:
-              self.index++;
-              if (self.index > sizeof(KEEP_ALIVE)-1
-                  || c != KEEP_ALIVE[self.index]) {
-                h_state = h_matching_connection_token;
-              } else if (self.index == sizeof(KEEP_ALIVE)-2) {
-                h_state = h_connection_keep_alive;
-              }
-              break;
-
-            /* looking for 'Connection: close' */
-            case h_matching_connection_close:
-              self.index++;
-              if (self.index > sizeof(CLOSE)-1 || c != CLOSE[self.index]) {
-                h_state = h_matching_connection_token;
-              } else if (self.index == sizeof(CLOSE)-2) {
-                h_state = h_connection_close;
-              }
-              break;
-
-            /* looking for 'Connection: upgrade' */
-            case h_matching_connection_upgrade:
-              self.index++;
-              if (self.index > sizeof(UPGRADE) - 1 ||
-                  c != UPGRADE[self.index]) {
-                h_state = h_matching_connection_token;
-              } else if (self.index == sizeof(UPGRADE)-2) {
-                h_state = h_connection_upgrade;
-              }
-              break;
-
-            case h_matching_connection_token:
-              if (ch == ',') {
-                h_state = h_matching_connection_token_start;
-                self.index = 0;
-              }
-              break;
-
-            case h_transfer_encoding_chunked:
-              if (ch != ' ') h_state = h_general;
-              break;
-
-            case h_connection_keep_alive:
-            case h_connection_close:
-            case h_connection_upgrade:
-              if (ch == ',') {
-                if (h_state == h_connection_keep_alive) {
-                  parser->flags |= F_CONNECTION_KEEP_ALIVE;
-                } else if (h_state == h_connection_close) {
-                  parser->flags |= F_CONNECTION_CLOSE;
-                } else if (h_state == h_connection_upgrade) {
-                  parser->flags |= F_CONNECTION_UPGRADE;
-                }
-                h_state = h_matching_connection_token_start;
-                self.index = 0;
-              } else if (ch != ' ') {
-                h_state = h_matching_connection_token;
-              }
-              break;
-
-            default:
-              UPDATE_STATE(s_header_value);
-              h_state = h_general;
-              break;
-          }
-        }
-        self.header_state = h_state;
-
-        COUNT_HEADER_SIZE(p - start);
-
-        if (p == data + len)
-          --p;
-        break;
-      }
 
       case s_header_almost_done:
       {

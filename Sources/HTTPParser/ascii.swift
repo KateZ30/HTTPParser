@@ -22,6 +22,7 @@ let cQM       : CChar = 63 // ?
 let cLSB      : CChar = 91 // [
 let cRSB      : CChar = 93 // ]
 let cDOT      : CChar = 46 // .
+let cCOMMA    : CChar = 44 // ,
 
 let cA : CChar = 65 // A
 let cB : CChar = 66
@@ -46,6 +47,7 @@ let cT : CChar = 84
 let cU : CChar = 85 // U
 
 let cc : CChar =  99 // c
+let ck : CChar = 107 // k
 let cn : CChar = 110 // n
 let co : CChar = 111 // o
 let cp : CChar = 112 // p
