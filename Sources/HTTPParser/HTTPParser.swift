@@ -273,7 +273,9 @@ public class HTTPParser {
     var p             = data
     var CURRENT_STATE = self.state
     
-    if (len == 0) {
+    // handle EOF
+    
+    if (len == 0 /* EOF */) {
       switch CURRENT_STATE {
         case .s_body_identity_eof:
           /* Use of CALLBACK_NOTIFY() here would erroneously return 1 byte read if
@@ -296,7 +298,7 @@ public class HTTPParser {
     }
     
     
-    // collect markers
+    // collect data markers
     
     var header_field_mark : UnsafePointer<CChar> = nil
     var header_value_mark : UnsafePointer<CChar> = nil
@@ -309,24 +311,29 @@ public class HTTPParser {
       case .s_header_value: header_value_mark = data
       case .s_res_status:   status_mark       = data
       
-      case .s_req_path:               fallthrough
-      case .s_req_schema:             fallthrough
-      case .s_req_schema_slash:       fallthrough
-      case .s_req_schema_slash_slash: fallthrough
-      case .s_req_server_start:       fallthrough
-      case .s_req_server:             fallthrough
-      case .s_req_server_with_at:     fallthrough
-      case .s_req_query_string_start: fallthrough
-      case .s_req_query_string:       fallthrough
-      case .s_req_fragment_start:     fallthrough
-      case .s_req_fragment:
+      case .s_req_path, .s_req_schema, .s_req_schema_slash,
+           .s_req_schema_slash_slash, .s_req_server_start, .s_req_server,
+           .s_req_server_with_at, .s_req_query_string_start,
+           .s_req_query_string, .s_req_fragment_start, .s_req_fragment:
         url_mark = data
       
       default: break
     }
     
-    // `MARK` macro in original:
-    //    #define MARK(FOR) if (!FOR##_mark)  FOR##_mark = p;
+    func MARK(cbe: Callback /*, p : UnsafePointer<CChar> = p */) {
+      // Note: argument crashes swiftc 2.2
+      // #define MARK(FOR) if (!FOR##_mark)  FOR##_mark = p;
+      switch cbe {
+        case .HeaderField:
+          if header_field_mark == nil { header_field_mark = p }
+        case .HeaderValue:
+          if header_value_mark == nil { header_value_mark = p }
+        case .URL:    if url_mark    == nil { url_mark    = p }
+        case .Body:   if body_mark   == nil { body_mark   = p }
+        case .Status: if status_mark == nil { status_mark = p }
+        default: assert(false, "Callback has no marker")
+      }
+    }
     
     
     func RETURN(V: size_t) -> size_t {
@@ -503,7 +510,7 @@ public class HTTPParser {
         case .s_res_status_start:
           if ch == CR { UPDATE_STATE(.s_res_line_almost_done); break }
           if ch == LF { UPDATE_STATE(.s_header_field_start);   break }
-          if status_mark == nil { status_mark = p } // MARK(status);
+          MARK(.Status)
           UPDATE_STATE(.s_res_status);
           self.index = 0;
 
@@ -664,7 +671,7 @@ public class HTTPParser {
         case .s_req_spaces_before_url:
           if ch == cSPACE { break }
           
-          if url_mark == nil { url_mark = p } // MARK(url)
+          MARK(.URL)
           if (self.method == .CONNECT) {
             UPDATE_STATE(.s_req_server_start);
           }
@@ -805,8 +812,7 @@ public class HTTPParser {
           guard c != 0 else { return gotoError(.INVALID_HEADER_TOKEN) }
 
 
-          // MARK(header_field);
-          if header_field_mark == nil { header_field_mark = p }
+          MARK(.HeaderField);
 
           self.index = 0;
           UPDATE_STATE(.s_header_field)
@@ -945,8 +951,7 @@ public class HTTPParser {
           fallthrough
 
         case .s_header_value_start:
-          // MARK(header_value);
-          if header_value_mark == nil { header_value_mark = p }
+          MARK(.HeaderValue)
           
           UPDATE_STATE(.s_header_value)
           self.index = 0
@@ -1212,8 +1217,7 @@ public class HTTPParser {
             }
 
             /* header value was empty */
-            // MARK(header_value);
-            if header_value_mark == nil { header_value_mark = p }
+            MARK(.HeaderValue)
             UPDATE_STATE(.s_header_field_start);
             
             let rc = CALLBACK_DATA_NOADVANCE(.HeaderValue,
@@ -1348,7 +1352,7 @@ public class HTTPParser {
            * Further, if content_length ends up at 0, we want to see the last
            * byte again for our message complete callback.
            */
-          if body_mark == nil { body_mark = p } // MARK(body);
+          MARK(.Body)
 
           self.content_length -= to_read;
           p += to_read - 1;
@@ -1375,9 +1379,9 @@ public class HTTPParser {
         
         /* read until EOF */
         case .s_body_identity_eof:
-          if body_mark == nil { body_mark = p } // MARK(body);
+          MARK(.Body)
           p = data + len - 1;
-
+        
         case .s_message_done:
           UPDATE_STATE(NEW_MESSAGE)
           
@@ -1464,7 +1468,7 @@ public class HTTPParser {
           /* See the explanation in s_body_identity for why the content
            * length and data pointers are managed this way.
            */
-          if body_mark == nil { body_mark = p } // MARK(body);
+          MARK(.Body)
           self.content_length -= to_read;
           p += to_read - 1;
 
@@ -1528,7 +1532,7 @@ public class HTTPParser {
      * value that's in-bounds).
      */
 
-    /* this seems to hang swiftc 2.2
+    /* this seems to xhang swiftc 2.2
      assert(((header_field_mark != nil ? 1 : 0) +
              (header_value_mark != nil ? 1 : 0) +
              (url_mark          != nil ? 1 : 0) +
@@ -1860,6 +1864,23 @@ enum ParserState : Int {
   // PARSING_HEADER macro in orig
   var isParsingHeader : Bool {
     return self.rawValue <= ParserState.s_headers_done.rawValue
+  }
+  
+  var isURLMarkerState : Bool {
+    switch self {
+      case .s_req_path:               fallthrough
+      case .s_req_schema:             fallthrough
+      case .s_req_schema_slash:       fallthrough
+      case .s_req_schema_slash_slash: fallthrough
+      case .s_req_server_start:       fallthrough
+      case .s_req_server:             fallthrough
+      case .s_req_server_with_at:     fallthrough
+      case .s_req_query_string_start: fallthrough
+      case .s_req_query_string:       fallthrough
+      case .s_req_fragment_start:     fallthrough
+      case .s_req_fragment: return true
+      default: return false
+    }
   }
 }
 
