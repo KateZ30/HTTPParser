@@ -212,20 +212,6 @@ extension HTTPMethod : CustomStringConvertible {
   }
 }
 
-extension String {
-  
-  func makeCString() -> UnsafePointer<CChar> {
-    var ptr : UnsafeMutablePointer<CChar> = nil
-    self.withCString { cstr in
-      let len = strlen(cstr)
-      ptr = UnsafeMutablePointer<CChar>.alloc(Int(len) + 1)
-      strcpy(ptr, cstr)
-    }
-    return UnsafePointer<CChar>(ptr)
-  }
-  
-}
-
 public extension HTTPMethod {
   
   // TBD: I don't know. Yes, this allocs, but I have no idea how to do this

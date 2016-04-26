@@ -17,6 +17,7 @@
 		E804482C1CCE4F6500447204 /* HTTPStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448261CCE4F6500447204 /* HTTPStatus.swift */; };
 		E80448481CCE5D1500447204 /* ascii.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448471CCE5D1500447204 /* ascii.swift */; };
 		E804484A1CCFA28D00447204 /* HTTPParserState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448491CCFA28D00447204 /* HTTPParserState.swift */; };
+		E837E5231CD00B8C00794356 /* CString.swift in Sources */ = {isa = PBXBuildFile; fileRef = E837E5221CD00B8C00794356 /* CString.swift */; };
 		E8921F891CCEA2B400E8611B /* URLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8921F881CCEA2B400E8611B /* URLParser.swift */; };
 /* End PBXBuildFile section */
 
@@ -59,6 +60,7 @@
 		E80448461CCE55A900447204 /* http_parser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = http_parser.h; sourceTree = "<group>"; };
 		E80448471CCE5D1500447204 /* ascii.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ascii.swift; path = Sources/HTTPParser/ascii.swift; sourceTree = SOURCE_ROOT; };
 		E80448491CCFA28D00447204 /* HTTPParserState.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HTTPParserState.swift; path = Sources/HTTPParser/HTTPParserState.swift; sourceTree = SOURCE_ROOT; };
+		E837E5221CD00B8C00794356 /* CString.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = CString.swift; path = Sources/HTTPParser/CString.swift; sourceTree = SOURCE_ROOT; };
 		E8921F881CCEA2B400E8611B /* URLParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = URLParser.swift; path = Sources/HTTPParser/URLParser.swift; sourceTree = SOURCE_ROOT; };
 		E8921F8A1CCEC9C900E8611B /* SwiftNotes.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SwiftNotes.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -118,6 +120,7 @@
 				E80448261CCE4F6500447204 /* HTTPStatus.swift */,
 				E8921F881CCEA2B400E8611B /* URLParser.swift */,
 				E80448471CCE5D1500447204 /* ascii.swift */,
+				E837E5221CD00B8C00794356 /* CString.swift */,
 				E804480A1CCE4ECD00447204 /* Info.plist */,
 			);
 			path = HTTPParser;
@@ -267,6 +270,7 @@
 			files = (
 				E804482B1CCE4F6500447204 /* HTTPParserURLFields.swift in Sources */,
 				E804484A1CCFA28D00447204 /* HTTPParserState.swift in Sources */,
+				E837E5231CD00B8C00794356 /* CString.swift in Sources */,
 				E80448281CCE4F6500447204 /* HTTPMethod.swift in Sources */,
 				E8921F891CCEA2B400E8611B /* URLParser.swift in Sources */,
 				E80448271CCE4F6500447204 /* HTTPError.swift in Sources */,

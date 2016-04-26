@@ -35,6 +35,8 @@
 let HTTP_PARSER_STRICT   = false
 let HTTP_MAX_HEADER_SIZE = (80*1024)
 
+let debugOn = true
+
 // HTTP_METHOD_MAP - is HTTPMethod enum
 // HTTP_ERRNO_MAP  - is HTTPError  enum
 
@@ -302,12 +304,10 @@ public class HTTPParser {
       default: break
     }
     
-    let debugOn = true
-    
     func MARK(cbe: Callback /*, p : UnsafePointer<CChar> = p */) {
       // Note: argument crashes swiftc 2.2
       // #define MARK(FOR) if (!FOR##_mark)  FOR##_mark = p;
-      if debugOn { print("MARK \(cbe)") }
+      if debugOn { print("  MARK \(cbe)") }
       switch cbe {
         case .HeaderField:
           if header_field_mark == nil { header_field_mark = p }
@@ -328,7 +328,7 @@ public class HTTPParser {
     }
     
     func UPDATE_STATE(state: ParserState) {
-      if debugOn { print("UPDATE_STATE \(CURRENT_STATE) => \(state)") }
+      if debugOn { print("  UPDATE_STATE \(CURRENT_STATE) => \(state)") }
       CURRENT_STATE = state
     }
     
@@ -355,10 +355,16 @@ public class HTTPParser {
     func step(ch: CChar) -> StepResult {
       /* reexecute: label */
 
-      if debugOn { print("<STEP \(ch) len=\(p - data) \(CURRENT_STATE)") }
+      if debugOn {
+        print("\n<---------------------------------------")
+        print("STEP \(debugChar(ch)) len=\(p - data) " +
+              "\(CURRENT_STATE)")
+      }
       defer {
         if debugOn {
-          print(">STEP \(ch) len=\(p - data) \(CURRENT_STATE) \(self.error)")
+          print("DONE \(debugChar(ch)) len=\(p - data) " +
+                "\(CURRENT_STATE) \(self.error)")
+          print("\n>---------------------------------------")
         }
       }
       
@@ -570,6 +576,8 @@ public class HTTPParser {
           let rc = CALLBACK_NOTIFY(.MessageBegin, &CURRENT_STATE, p, data)
           if let rc = rc { return .CallbackDone(rc) }
           
+          if debugOn { print("  METHOD: \(self.method)") }
+          
           break;
 
         case .s_req_method:
@@ -660,8 +668,9 @@ public class HTTPParser {
           } else {
             return .Error(.INVALID_METHOD)
           }
-
+          
           self.index += 1
+          if debugOn { print("  METHOD: \(self.method) INDEX \(self.index)") }
 
         case .s_req_spaces_before_url:
           if ch == cSPACE { break }
@@ -1499,7 +1508,7 @@ public class HTTPParser {
       let ch = p.memory
       
       if debugOn {
-        print("  LOOP CHAR \(ch) '\(UnicodeScalar(Int(ch)))' "
+        print("  LOOP CHAR \(debugChar(ch)) "
               + "len=\(p - data) \(CURRENT_STATE)")
       }
       
@@ -1518,19 +1527,19 @@ public class HTTPParser {
         switch rc {
           case .Continue:
             if debugOn {
-              print("  CONTINUE \(ch) '\(UnicodeScalar(Int(ch)))' " +
+              print("  CONTINUE \(debugChar(ch)) " +
                     "len=\(p - data) \(CURRENT_STATE)")
             }
           
           case .Reexecute:
             if debugOn {
-              print("  REEXECUTE \(ch) '\(UnicodeScalar(Int(ch)))' " +
+              print("  REEXECUTE \(debugChar(ch)) " +
                     "len=\(p - data) \(CURRENT_STATE)")
             }
           
           case .CallbackDone(let ER): // the C CALLBACK macros directly return
             if debugOn {
-              print("  CALLBACK DONE \(ch) '\(UnicodeScalar(Int(ch)))' " +
+              print("  CALLBACK DONE \(debugChar(ch)) " +
                     "ER=\(ER) len=\(p - data) \(CURRENT_STATE)")
             }
             return ER
@@ -1538,14 +1547,14 @@ public class HTTPParser {
           case .Return(let len):
             // this is different to CBDone in that it updates the state
             if debugOn {
-              print("  RETURN \(ch) '\(UnicodeScalar(Int(ch)))'" +
+              print("  RETURN \(debugChar(ch))" +
                     " LEN=\(len) len=\(p - data) \(CURRENT_STATE)")
             }
             return RETURN(len)
           
           case .Error(let error):
             if debugOn {
-              print("  ERROR \(ch) '\(UnicodeScalar(Int(ch)))' \(error)" +
+              print("  ERROR \(debugChar(ch)) \(error)" +
                     " LEN=\(len) len=\(p - data) \(CURRENT_STATE)")
             }
             self.error = error == .OK ? .UNKNOWN : error
@@ -1699,6 +1708,18 @@ public class HTTPParser {
     }
     return true
   }
+}
+
+func debugChar(ch: CChar) -> String {
+  let p : String
+  switch ch {
+    case LF:   p = "NL"
+    case CR:   p = "CR"
+    case cTAB: p = "TAB"
+    default:
+      p = "'\(UnicodeScalar(Int(ch)))'"
+  }
+  return "\(ch) \(p)"
 }
 
 
