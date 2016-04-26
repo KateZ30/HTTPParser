@@ -335,22 +335,28 @@ public class HTTPParser {
       }
     }
     
-    
+    /// transfer CURRENT_STATE to ivar and return the given value
     func RETURN(V: size_t) -> size_t {
       self.state = CURRENT_STATE
       return V
     }
+    
+    /// set the `error` ivar and return the number of bytes consumed
     func gotoError(e : HTTPError? = nil) -> size_t {
       if let e = e { error = e }
       if error == .OK { error = .UNKNOWN }
-      return RETURN(p - data)
+      return RETURN(p - data) // size consumed
     }
     
     func UPDATE_STATE(state: ParserState) {
       CURRENT_STATE = state
     }
     
+    
+    /* the main loop */
+    
     var ch : CChar
+    
 
     // REEXECUTE macro:
     //   if let len = gotoReexecute() { return len } // error?
@@ -680,27 +686,26 @@ public class HTTPParser {
           if (CURRENT_STATE == .s_dead) { return gotoError(.INVALID_URL) }
 
 
-        case .s_req_schema:             fallthrough
-        case .s_req_schema_slash:       fallthrough
-        case .s_req_schema_slash_slash: fallthrough
-        case .s_req_server_start:
+        case .s_req_schema,
+             .s_req_schema_slash,
+             .s_req_schema_slash_slash,
+             .s_req_server_start:
           switch ch {
             /* No whitespace allowed here */
-            case cSPACE: fallthrough
-            case CR:     fallthrough
-            case LF:     return gotoError(.INVALID_URL)
+            case cSPACE, CR, LF:
+              return gotoError(.INVALID_URL)
             default:
               UPDATE_STATE(parse_url_char(CURRENT_STATE, ch))
               if CURRENT_STATE == .s_dead { return gotoError(.INVALID_URL) }
           }
 
-      case .s_req_server:             fallthrough
-      case .s_req_server_with_at:     fallthrough
-      case .s_req_path:               fallthrough
-      case .s_req_query_string_start: fallthrough
-      case .s_req_query_string:       fallthrough
-      case .s_req_fragment_start:     fallthrough
-      case .s_req_fragment:
+      case .s_req_server,
+           .s_req_server_with_at,
+           .s_req_path,
+           .s_req_query_string_start,
+           .s_req_query_string,
+           .s_req_fragment_start,
+           .s_req_fragment:
         switch ch {
           case cSPACE:
             UPDATE_STATE(.s_req_http_start)
@@ -708,8 +713,7 @@ public class HTTPParser {
             let rc = CALLBACK_DATA(.URL, &url_mark, &CURRENT_STATE, p, data)
             if let rc = rc { return rc } // error
           
-          case CR: fallthrough
-          case LF:
+          case CR, LF:
             self.http_major = 0
             self.http_minor = 9
             UPDATE_STATE(ch == CR
@@ -906,10 +910,8 @@ public class HTTPParser {
                   self.header_state = .h_upgrade;
                 }
 
-              case .h_connection:        fallthrough
-              case .h_content_length:    fallthrough
-              case .h_transfer_encoding: fallthrough
-              case .h_upgrade:
+              case .h_connection, .h_content_length, .h_transfer_encoding,
+                   .h_upgrade:
                 if ch != cSPACE { self.header_state = .h_general }
 
               default:
@@ -1049,8 +1051,8 @@ public class HTTPParser {
                 }
                 p -= 1
 
-              case .h_connection: fallthrough
-              case .h_transfer_encoding:
+              case .h_connection,
+                   .h_transfer_encoding:
                 assert(false, "Shouldn't get here.")
 
               case .h_content_length:
@@ -1135,11 +1137,10 @@ public class HTTPParser {
 
               case .h_transfer_encoding_chunked:
                 if ch != cSPACE { h_state = .h_general }
-                break;
 
-              case .h_connection_keep_alive: fallthrough
-              case .h_connection_close:      fallthrough
-              case .h_connection_upgrade:
+              case .h_connection_keep_alive,
+                   .h_connection_close,
+                   .h_connection_upgrade:
                 if ch == cCOMMA {
                   if h_state == .h_connection_keep_alive {
                     self.flags.insert(.F_CONNECTION_KEEP_ALIVE)
@@ -1506,6 +1507,9 @@ public class HTTPParser {
       return nil // no exception, goto next byte
     }
     
+    
+    /* the main loop */
+    
     assert(p == data)
     while p != (data + len) {
       ch = p.memory
@@ -1514,9 +1518,11 @@ public class HTTPParser {
         if !COUNT_HEADER_SIZE(1) { return gotoError() }
       }
       
+      // Original: reexecute: switch CURRENT_STATE {} ...
+      
       // well, this recurses ... which is likely very bad
       if let len = gotoReexecute() { return len } // error?
-    
+      
       // FOR LOOP END
       p += 1
     }
@@ -1868,18 +1874,14 @@ enum ParserState : Int {
   
   var isURLMarkerState : Bool {
     switch self {
-      case .s_req_path:               fallthrough
-      case .s_req_schema:             fallthrough
-      case .s_req_schema_slash:       fallthrough
-      case .s_req_schema_slash_slash: fallthrough
-      case .s_req_server_start:       fallthrough
-      case .s_req_server:             fallthrough
-      case .s_req_server_with_at:     fallthrough
-      case .s_req_query_string_start: fallthrough
-      case .s_req_query_string:       fallthrough
-      case .s_req_fragment_start:     fallthrough
-      case .s_req_fragment: return true
-      default: return false
+      case .s_req_path,
+           .s_req_schema,.s_req_schema_slash, .s_req_schema_slash_slash,
+           .s_req_server_start, .s_req_server, .s_req_server_with_at,
+           .s_req_query_string_start, .s_req_query_string,
+           .s_req_fragment_start, .s_req_fragment:
+        return true
+      default:
+        return false
     }
   }
 }
