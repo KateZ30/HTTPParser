@@ -35,7 +35,7 @@
 let HTTP_PARSER_STRICT   = false
 let HTTP_MAX_HEADER_SIZE = (80*1024)
 
-let debugOn = true
+let debugOn = false
 
 // HTTP_METHOD_MAP - is HTTPMethod enum
 // HTTP_ERRNO_MAP  - is HTTPError  enum
@@ -359,9 +359,17 @@ public class HTTPParser {
         print("\n<---------------------------------------")
         print("STEP \(debugChar(ch)) len=\(p - data) " +
               "\(CURRENT_STATE)")
+
+        if CURRENT_STATE == .s_header_field {
+          print("xxx HEADER FIELD")
+        }
       }
       defer {
         if debugOn {
+          if CURRENT_STATE == .s_header_field {
+            print("xxx HEADER FIELD")
+          }
+          
           print("DONE \(debugChar(ch)) len=\(p - data) " +
                 "\(CURRENT_STATE) \(self.error)")
           print("\n>---------------------------------------")
@@ -826,8 +834,9 @@ public class HTTPParser {
         case .s_header_field:
           let start = p
           
+          var ch = p.memory // needs to be outside of the loop!
           while p != (data + len) {
-            let ch = p.memory
+            ch = p.memory
             let c = TOKEN(ch)
             if  c == 0 { break }
 
@@ -921,6 +930,12 @@ public class HTTPParser {
           if p == data + len {
             p -= 1
             break
+          }
+          
+          if debugOn {
+            let s = String.fromCString(header_field_mark,
+                                       length: (p - header_field_mark))!
+            print("  H: \(s) CH: \(debugChar(ch))")
           }
 
           if ch == cCOLON {
@@ -1508,8 +1523,14 @@ public class HTTPParser {
       let ch = p.memory
       
       if debugOn {
-        print("  LOOP CHAR \(debugChar(ch)) "
-              + "len=\(p - data) \(CURRENT_STATE)")
+        let s = String.fromCString(data, length: p-data)!
+        let sq = String(s.characters.map {
+          if $0 == "\r" { return "#" }
+          if $0 == "\n" { return "#" }
+          return $0
+        })
+        print("\n+  LOOP CHAR \(debugChar(ch)) '\(sq)'"
+              + " len=\(p - data) \(CURRENT_STATE)")
       }
       
       if CURRENT_STATE.isParsingHeader {
