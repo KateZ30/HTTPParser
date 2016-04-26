@@ -30,12 +30,17 @@ class HTTPParserTests: XCTestCase {
       return 0
     }
     parser.onHeadersComplete = { p in
-      print("*** CB: headers done")
+      print("*** CB: headers done: method=\(p.method)")
       return 0
     }
     parser.onHeaderField = { p, ptr, len in
       let s = String.fromCString(ptr, length: len)
       print("*** CB: header field: \(s)")
+      return 0
+    }
+    parser.onHeaderValue = { p, ptr, len in
+      let s = String.fromCString(ptr, length: len)
+      print("*** CB: header value: \(s)")
       return 0
     }
     parser.onBody = { p, ptr, len in
