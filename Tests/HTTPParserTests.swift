@@ -22,23 +22,34 @@ class HTTPParserTests: XCTestCase {
     XCTAssertNotNil(parser)
     
     parser.onMessageBegin = { p in
-      print("CB: message begin")
+      print("*** CB: message begin")
+      return 0
+    }
+    parser.onMessageComplete = { p in
+      print("*** CB: message DONE")
+      return 0
+    }
+    parser.onHeadersComplete = { p in
+      print("*** CB: headers done")
       return 0
     }
     parser.onHeaderField = { p, ptr, len in
-      print("CB: header field")
+      let s = String.fromCString(ptr, length: len)
+      print("*** CB: header field: \(s)")
       return 0
     }
     parser.onBody = { p, ptr, len in
-      print("CB: body")
+      print("*** CB: body")
       return 0
     }
     parser.onStatus = { p, ptr, len in
-      print("CB: status")
+      let s = String.fromCString(ptr, length: len)
+      print("*** CB: status \(s)")
       return 0
     }
     parser.onURL = { p, ptr, len in
-      print("CB: url")
+      let s = String.fromCString(ptr, length: len)
+      print("*** CB: url: \(s)")
       return 0
     }
     
