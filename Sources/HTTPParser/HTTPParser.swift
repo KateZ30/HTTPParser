@@ -302,9 +302,12 @@ public class HTTPParser {
       default: break
     }
     
+    let debugOn = true
+    
     func MARK(cbe: Callback /*, p : UnsafePointer<CChar> = p */) {
       // Note: argument crashes swiftc 2.2
       // #define MARK(FOR) if (!FOR##_mark)  FOR##_mark = p;
+      if debugOn { print("MARK \(cbe)") }
       switch cbe {
         case .HeaderField:
           if header_field_mark == nil { header_field_mark = p }
@@ -319,11 +322,13 @@ public class HTTPParser {
     
     /// transfer `CURRENT_STATE` to `state` ivar and return the given value
     func RETURN(V: size_t) -> size_t {
+      if debugOn { print("RETURN old \(self.state) new \(CURRENT_STATE)") }
       self.state = CURRENT_STATE
       return V
     }
     
     func UPDATE_STATE(state: ParserState) {
+      if debugOn { print("UPDATE_STATE \(CURRENT_STATE) => \(state)") }
       CURRENT_STATE = state
     }
     
@@ -349,6 +354,11 @@ public class HTTPParser {
     //   if let len = gotoReexecute() { return len } // error?
     func step(ch: CChar) -> StepResult {
       /* reexecute: label */
+
+      if debugOn { print("<STEP \(ch) len=\(p - data) \(CURRENT_STATE)") }
+      defer {
+        if debugOn { print(">STEP \(ch) len=\(p - data) \(CURRENT_STATE)") }
+      }
       
       switch CURRENT_STATE {
         case .s_dead:
@@ -1482,8 +1492,11 @@ public class HTTPParser {
     /* the main loop */
     
     assert(p == data)
+    if debugOn { print("START LOOP len=\(p - data) \(CURRENT_STATE)") }
     while p != (data + len) {
       let ch = p.memory
+      
+      if debugOn { print("  LOOP CHAR \(ch) len=\(p - data) \(CURRENT_STATE)") }
       
       if CURRENT_STATE.isParsingHeader {
         if !COUNT_HEADER_SIZE(1) {
@@ -1498,18 +1511,36 @@ public class HTTPParser {
       repeat {
         rc = step(ch)
         switch rc {
-          case .Continue:  break
+          case .Continue:
+            if debugOn {
+              print("  CONTINUE \(ch) len=\(p - data) \(CURRENT_STATE)")
+            }
           
-          case .Reexecute: break
+          case .Reexecute:
+            if debugOn {
+              print("  REEXECUTE \(ch) len=\(p - data) \(CURRENT_STATE)")
+            }
           
           case .CallbackDone(let ER): // the C CALLBACK macros directly return
+            if debugOn {
+              print("  CALLBACK DONE \(ch) ER=\(ER) len=\(p - data) " +
+                    "\(CURRENT_STATE)")
+            }
             return ER
           
           case .Return(let len):
             // this is different to CBDone in that it updates the state
+            if debugOn {
+              print("  RETURN \(ch) LEN=\(len) len=\(p - data) " +
+                    "\(CURRENT_STATE)")
+            }
             return RETURN(len)
           
           case .Error(let error):
+            if debugOn {
+              print("  ERROR \(ch) \(error) LEN=\(len) len=\(p - data) " +
+                    "\(CURRENT_STATE)")
+            }
             self.error = error == .OK ? .UNKNOWN : error
             return RETURN(p - data) // size consumed
         }
@@ -1520,6 +1551,7 @@ public class HTTPParser {
       // FOR LOOP END
       p += 1
     }
+    if debugOn { print("LOOP DONE len=\(p - data) \(CURRENT_STATE)") }
     
     
     /* Run callbacks for any marks that we have leftover after we ran our of
