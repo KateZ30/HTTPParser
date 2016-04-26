@@ -22,24 +22,24 @@ class HTTPParserTests: XCTestCase {
     XCTAssertNotNil(parser)
     
     parser.onMessageBegin = { p in
-      print("message begin")
-      return 1
+      print("CB: message begin")
+      return 0
     }
     parser.onHeaderField = { p, ptr, len in
-      print("header field")
-      return 1
+      print("CB: header field")
+      return 0
     }
     parser.onBody = { p, ptr, len in
-      print("body")
-      return 1
+      print("CB: body")
+      return 0
     }
     parser.onStatus = { p, ptr, len in
-      print("status")
-      return 1
+      print("CB: status")
+      return 0
     }
     parser.onURL = { p, ptr, len in
-      print("url")
-      return 1
+      print("CB: url")
+      return 0
     }
     
     simpleGetRequest.withCString { cstr in

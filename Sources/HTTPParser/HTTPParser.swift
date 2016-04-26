@@ -357,7 +357,9 @@ public class HTTPParser {
 
       if debugOn { print("<STEP \(ch) len=\(p - data) \(CURRENT_STATE)") }
       defer {
-        if debugOn { print(">STEP \(ch) len=\(p - data) \(CURRENT_STATE)") }
+        if debugOn {
+          print(">STEP \(ch) len=\(p - data) \(CURRENT_STATE) \(self.error)")
+        }
       }
       
       switch CURRENT_STATE {
@@ -1496,7 +1498,10 @@ public class HTTPParser {
     while p != (data + len) {
       let ch = p.memory
       
-      if debugOn { print("  LOOP CHAR \(ch) len=\(p - data) \(CURRENT_STATE)") }
+      if debugOn {
+        print("  LOOP CHAR \(ch) '\(UnicodeScalar(Int(ch)))' "
+              + "len=\(p - data) \(CURRENT_STATE)")
+      }
       
       if CURRENT_STATE.isParsingHeader {
         if !COUNT_HEADER_SIZE(1) {
@@ -1513,33 +1518,35 @@ public class HTTPParser {
         switch rc {
           case .Continue:
             if debugOn {
-              print("  CONTINUE \(ch) len=\(p - data) \(CURRENT_STATE)")
+              print("  CONTINUE \(ch) '\(UnicodeScalar(Int(ch)))' " +
+                    "len=\(p - data) \(CURRENT_STATE)")
             }
           
           case .Reexecute:
             if debugOn {
-              print("  REEXECUTE \(ch) len=\(p - data) \(CURRENT_STATE)")
+              print("  REEXECUTE \(ch) '\(UnicodeScalar(Int(ch)))' " +
+                    "len=\(p - data) \(CURRENT_STATE)")
             }
           
           case .CallbackDone(let ER): // the C CALLBACK macros directly return
             if debugOn {
-              print("  CALLBACK DONE \(ch) ER=\(ER) len=\(p - data) " +
-                    "\(CURRENT_STATE)")
+              print("  CALLBACK DONE \(ch) '\(UnicodeScalar(Int(ch)))' " +
+                    "ER=\(ER) len=\(p - data) \(CURRENT_STATE)")
             }
             return ER
           
           case .Return(let len):
             // this is different to CBDone in that it updates the state
             if debugOn {
-              print("  RETURN \(ch) LEN=\(len) len=\(p - data) " +
-                    "\(CURRENT_STATE)")
+              print("  RETURN \(ch) '\(UnicodeScalar(Int(ch)))'" +
+                    " LEN=\(len) len=\(p - data) \(CURRENT_STATE)")
             }
             return RETURN(len)
           
           case .Error(let error):
             if debugOn {
-              print("  ERROR \(ch) \(error) LEN=\(len) len=\(p - data) " +
-                    "\(CURRENT_STATE)")
+              print("  ERROR \(ch) '\(UnicodeScalar(Int(ch)))' \(error)" +
+                    " LEN=\(len) len=\(p - data) \(CURRENT_STATE)")
             }
             self.error = error == .OK ? .UNKNOWN : error
             return RETURN(p - data) // size consumed
