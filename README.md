@@ -1,71 +1,87 @@
 HTTP Parser
 ===========
 
-[![Build Status](https://travis-ci.org/joyent/http-parser.png?branch=master)](https://travis-ci.org/joyent/http-parser)
-
-This is a parser for HTTP messages written in C. It parses both requests and
+This is a parser for HTTP messages written in Swift. It parses both requests and
 responses. The parser is designed to be used in performance HTTP
 applications. It does not make any syscalls nor allocations, it does not
-buffer data, it can be interrupted at anytime. Depending on your
-architecture, it only requires about 40 bytes of data per message
-stream (in a web server that is per connection).
+buffer data, it can be interrupted at anytime.
 
 Features:
 
-  * No dependencies
-  * Handles persistent streams (keep-alive).
-  * Decodes chunked encoding.
-  * Upgrade support
-  * Defends against buffer overflow attacks.
+* No dependencies
+* Handles persistent streams (keep-alive).
+* Decodes chunked encoding.
+* Upgrade support
+* Defends against buffer overflow attacks.
 
 The parser extracts the following information from HTTP messages:
 
-  * Header fields and values
-  * Content-Length
-  * Request method
-  * Response status code
-  * Transfer-Encoding
-  * HTTP version
-  * Request URL
-  * Message body
+* Header fields and values
+* Content-Length
+* Request method
+* Response status code
+* Transfer-Encoding
+* HTTP version
+* Request URL
+* Message body
 
 
-Usage
------
+### Swift Port
 
-One `http_parser` object is used per TCP connection. Initialize the struct
-using `http_parser_init()` and set the callbacks. That might look something
-like this for a request parser:
-```c
-http_parser_settings settings;
-settings.on_url = my_url_callback;
-settings.on_header_field = my_header_field_callback;
+It is port of the Joyent C http-parser, which in turn is based on the NGINX
+parser by Igor Sysoev.
+An attempt was made to keep it close to the original, which results in quite
+ugly Swift, but well. The idea is to make it easier to patch in upstream changes
+to the C parser.
+
+Differences:
+- callbacks are replaced with closures, which are attached to the parser
+  itself (instead of being passed in as a http_parser_settings)
+- we use some Swift style enums
+- execute flow is different to the lack of goto's in Swift (uses nested
+  functions to share access to some variables)
+- no macros in Swift, hence they are replaced with funcs
+- some (one-time!) allocations are done to get constant C strings
+- can't use bitfields, which makes the parser object a little bigger than the
+  C version
+
+TODO:
+- URL parsing is not finished
+- porting bugs are inevitable, fix them
+
+
+### Usage
+
+One `HTTPParser` object is used per TCP connection. Initialize the object
+and set the callbacks. That might look something like this for a request parser:
+```Swift
+let parser : HTTPParser(.Request)
+parser.data = my_socket
+parser.onURL         { p, data, len in ... }
+parser.onHeaderField { p, data, len in ... }
 /* ... */
-
-http_parser *parser = malloc(sizeof(http_parser));
-http_parser_init(parser, HTTP_REQUEST);
-parser->data = my_socket;
 ```
 
 When data is received on the socket execute the parser and check for errors.
 
-```c
-size_t len = 80*1024, nparsed;
-char buf[len];
-ssize_t recved;
+```Swift
+let len     : size_t = 80*1024
+var nparsed : size_t = 0
+var buf     = UnsafePointer<UInt8>.alloc(len);
+var recved  : size_t = 0
 
 recved = recv(fd, buf, len, 0);
 
-if (recved < 0) {
+if recved < 0 {
   /* Handle error. */
 }
 
 /* Start up / continue the parser.
  * Note we pass recved==0 to signal that EOF has been received.
  */
-nparsed = http_parser_execute(parser, &settings, buf, recved);
+nparsed = parser.execute(buf, recved);
 
-if (parser->upgrade) {
+if (parser.upgrade) {
   /* handle new protocol */
 } else if (nparsed != recved) {
   /* Handle error. Usually just close the connection. */
@@ -75,19 +91,19 @@ if (parser->upgrade) {
 HTTP needs to know where the end of the stream is. For example, sometimes
 servers send responses without Content-Length and expect the client to
 consume input (for the body) until EOF. To tell http_parser about EOF, give
-`0` as the fourth parameter to `http_parser_execute()`. Callbacks and errors
+`0` as the second parameter to `execute()`. Callbacks and errors
 can still be encountered during an EOF, so one must still be prepared
 to receive them.
 
 Scalar valued message information such as `status_code`, `method`, and the
 HTTP version are stored in the parser structure. This data is only
-temporally stored in `http_parser` and gets reset on each new message. If
+temporally stored in `HTTPParser` and gets reset on each new message. If
 this information is needed later, copy it out of the structure during the
-`headers_complete` callback.
+`onHeadersComplete` callback.
 
 The parser decodes the transfer-encoding for both requests and responses
 transparently. That is, a chunked encoding is decoded before being sent to
-the on_body callback.
+the `onBody` callback.
 
 
 The Special Problem of Upgrade
@@ -111,34 +127,34 @@ WebSocket protocol.)
 
 To support this, the parser will treat this as a normal HTTP message without a
 body, issuing both on_headers_complete and on_message_complete callbacks. However
-http_parser_execute() will stop parsing at the end of the headers and return.
+execute() will stop parsing at the end of the headers and return.
 
 The user is expected to check if `parser->upgrade` has been set to 1 after
-`http_parser_execute()` returns. Non-HTTP data begins at the buffer supplied
-offset by the return value of `http_parser_execute()`.
+`execute()` returns. Non-HTTP data begins at the buffer supplied
+offset by the return value of `execute()`.
 
 
 Callbacks
 ---------
 
-During the `http_parser_execute()` call, the callbacks set in
-`http_parser_settings` will be executed. The parser maintains state and
+During the `execute()` call, the callbacks set will be executed. 
+The parser maintains state and
 never looks behind, so buffering the data is not necessary. If you need to
 save certain data for later usage, you can do that from the callbacks.
 
 There are two types of callbacks:
 
-* notification `typedef int (*http_cb) (http_parser*);`
-    Callbacks: on_message_begin, on_headers_complete, on_message_complete.
-* data `typedef int (*http_data_cb) (http_parser*, const char *at, size_t length);`
-    Callbacks: (requests only) on_url,
-               (common) on_header_field, on_header_value, on_body;
+* notification `typealias http_cb = ( HTTPParser ) -> Int`
+    Callbacks: onMessageBegin, onHeadersComplete, onMessageComplete.
+* data `typealias http_data_cb = ( HTTPParser, UnsafePointer<CChar>, size_t) -> Int`
+    Callbacks: (requests only) onURL,
+               (common) onHeaderField, onHeaderValue, onBody
 
 Callbacks must return 0 on success. Returning a non-zero value indicates
 error to the parser, making it exit immediately.
 
 For cases where it is necessary to pass local information to/from a callback,
-the `http_parser` object's `data` field can be used.
+the `HTTPParser` object's `data` field can be used.
 An example of such a case is when using threads to handle a socket connection,
 parse a request, and then give a response over that socket. By instantiation
 of a thread-local struct containing relevant data (e.g. accepted socket,
@@ -148,56 +164,50 @@ callback in a threadsafe manner. This allows http-parser to be used in
 multi-threaded contexts.
 
 Example:
-```
- typedef struct {
-  socket_t sock;
-  void* buffer;
-  int buf_len;
- } custom_data_t;
-
-
-int my_url_callback(http_parser* parser, const char *at, size_t length) {
-  /* access to thread local custom_data_t struct.
-  Use this access save parsed data for later use into thread local
-  buffer, or communicate over socket
-  */
-  parser->data;
-  ...
-  return 0;
-}
+```Swift
+ struct custom_data_t {
+  sock    : socket_t
+  buffer  : UnsafePointer<Void>
+  buf_len : Int
+ }
 
 ...
 
-void http_parser_thread(socket_t sock) {
- int nparsed = 0;
- /* allocate memory for user data */
- custom_data_t *my_data = malloc(sizeof(custom_data_t));
+func http_parser_thread(sock: socket_t) {
+  var nparsed = 0
+  /* allocate memory for user data */
+  my_data : custom_data_t
 
- /* some information for use by callbacks.
- * achieves thread -> callback information flow */
- my_data->sock = sock;
+  /* some information for use by callbacks.
+  * achieves thread -> callback information flow */
+  my_data.sock = sock
 
- /* instantiate a thread-local parser */
- http_parser *parser = malloc(sizeof(http_parser));
- http_parser_init(parser, HTTP_REQUEST); /* initialise parser */
- /* this custom data reference is accessible through the reference to the
- parser supplied to callback functions */
- parser->data = my_data;
+  /* instantiate a thread-local parser */
+  let parser = HTTPParser(.Request) /* initialise parser */
+  /* this custom data reference is accessible through the reference to the
+  parser supplied to callback functions */
+  parser.data = my_data;
 
- http_parser_settings settings; / * set up callbacks */
- settings.on_url = my_url_callback;
+  parser.onURL { parser, at, length in
+    /* access to thread local custom_data_t struct.
+    Use this access save parsed data for later use into thread local
+    buffer, or communicate over socket
+    */
+    let ud = parser->data as! custom_data_t
+    ...
+    return 0;
+  }
 
- /* execute parser */
- nparsed = http_parser_execute(parser, &settings, buf, recved);
+  /* execute parser */
+  nparsed = parser.execute(buf, recved);
 
- ...
- /* parsed information copied from callback.
- can now perform action on data copied into thread-local memory from callbacks.
- achieves callback -> thread information flow */
- my_data->buffer;
- ...
+  ...
+  /* parsed information copied from callback.
+  can now perform action on data copied into thread-local memory from callbacks.
+  achieves callback -> thread information flow */
+  my_data.buffer;
+  ...
 }
-
 ```
 
 In case you parse HTTP message in chunks (i.e. `read()` request line
@@ -237,7 +247,7 @@ Parsing URLs
 
 A simplistic zero-copy URL parser is provided as `http_parser_parse_url()`.
 Users of this library may wish to use it to parse URLs constructed from
-consecutive `on_url` callbacks.
+consecutive `onURL` callbacks.
 
 See examples of reading in headers:
 
