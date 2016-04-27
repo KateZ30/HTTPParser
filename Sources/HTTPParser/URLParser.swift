@@ -26,6 +26,72 @@
  * IN THE SOFTWARE.
  */
 
+// enum http_parser_url_fields
+// This is not a bitset in http_parser.h
+public struct HTTPParserURLFields : OptionSetType {
+  
+  public let rawValue : Int
+  
+  public init(rawValue: Int = 0) {
+    self.rawValue = rawValue
+  }
+  
+  static let SCHEMA   = HTTPParserURLFields(rawValue: 1 << 0)
+  static let HOST     = HTTPParserURLFields(rawValue: 1 << 1)
+  static let PORT     = HTTPParserURLFields(rawValue: 1 << 2)
+  static let PATH     = HTTPParserURLFields(rawValue: 1 << 3)
+  static let QUERY    = HTTPParserURLFields(rawValue: 1 << 4)
+  static let FRAGMENT = HTTPParserURLFields(rawValue: 1 << 5)
+  static let USERINFO = HTTPParserURLFields(rawValue: 1 << 6)
+}
+
+/* Result structure for http_parser_parse_url().
+ *
+ * Callers should index into field_data[] with UF_* values iff field_set
+ * has the relevant (1 << UF_*) bit set. As a courtesy to clients (and
+ * because we probably have padding left over), we convert any port to
+ * a uint16_t.
+ */
+public struct HTTPParserURL {
+  
+  var field_set : HTTPParserURLFields
+  var port      : UInt16 // Converted UF_PORT string
+  
+  /* Offset into buffer in which field starts */
+  var pSchema   : UnsafePointer<CChar>? = nil
+  var pHost     : UnsafePointer<CChar>? = nil
+  var pPort     : UnsafePointer<CChar>? = nil
+  var pPath     : UnsafePointer<CChar>? = nil
+  var pQuery    : UnsafePointer<CChar>? = nil
+  var pFragment : UnsafePointer<CChar>? = nil
+  var pUserInfo : UnsafePointer<CChar>? = nil
+
+  var lSchema   : Int16 = 0
+  var lHost     : Int16 = 0
+  var lPort     : Int16 = 0
+  var lPath     : Int16 = 0
+  var lQuery    : Int16 = 0
+  var lFragment : Int16 = 0
+  var lUserInfo : Int16 = 0
+  
+  mutating func setField(field: HTTPParserURLFields,
+                         _ ptr:   UnsafePointer<CChar>,
+                         _ len:   Int16)
+  {
+    switch field {
+      case HTTPParserURLFields.SCHEMA:   pSchema   = ptr; lSchema   = len
+      case HTTPParserURLFields.HOST:     pHost     = ptr; lHost     = len
+      case HTTPParserURLFields.PORT:     pPort     = ptr; lPort     = len
+      case HTTPParserURLFields.PATH:     pPath     = ptr; lPath     = len
+      case HTTPParserURLFields.QUERY:    pQuery    = ptr; lQuery    = len
+      case HTTPParserURLFields.FRAGMENT: pFragment = ptr; lFragment = len
+      case HTTPParserURLFields.USERINFO: pUserInfo = ptr; lUserInfo = len
+      default: fatalError("unexpected URL field")
+    }
+    field_set.insert(field)
+  }
+}
+
 /* Our URL parser.
  *
  * This is designed to be shared by http_parser_execute() for URL validation,

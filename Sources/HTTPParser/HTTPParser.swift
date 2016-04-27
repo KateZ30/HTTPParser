@@ -41,9 +41,9 @@ let debugOn = false
 // HTTP_ERRNO_MAP  - is HTTPError  enum
 
 public enum HTTPParserType {
-  case HTTP_REQUEST
-  case HTTP_RESPONSE
-  case HTTP_BOTH
+  case Request
+  case Response
+  case Both
 }
 
 public typealias http_data_cb = ( HTTPParser, UnsafePointer<CChar>, size_t) -> Int
@@ -113,7 +113,7 @@ public class HTTPParser {
   
   // MARK: - Init
   
-  public init(type: HTTPParserType = .HTTP_BOTH) { // http_parser_init
+  public init(type: HTTPParserType = .Both) { // http_parser_init
     self.type = type
     
     // start_state
@@ -121,7 +121,7 @@ public class HTTPParser {
   }
 
   public func reset() {
-    self.type              = .HTTP_BOTH
+    self.type              = .Both
     self.flags             = HTTPParserOptions()
     self.state             = .s_dead
     self.header_state      = .h_general
@@ -442,20 +442,20 @@ public class HTTPParser {
             if let len = len { return .CallbackDone(len) }
           }
           else {
-            self.type = .HTTP_REQUEST;
+            self.type = .Request;
             UPDATE_STATE(.s_start_req)
             return .Reexecute
           }
         
         case .s_res_or_resp_H:
           if ch == cT {
-            self.type = .HTTP_RESPONSE
+            self.type = .Response
             UPDATE_STATE(.s_res_HT)
           }
           else {
             guard ch == cE else { return .Error(.INVALID_CONSTANT) }
             
-            self.type   = .HTTP_REQUEST
+            self.type   = .Request
             self.method = .HEAD
             index = 2
             UPDATE_STATE(.s_req_method)
@@ -1718,7 +1718,7 @@ public class HTTPParser {
   }
   
   var startState : ParserState {
-    return type == .HTTP_REQUEST ? .s_start_req : .s_start_res
+    return type == .Request ? .s_start_req : .s_start_res
   }
   
   var shouldKeepAlive : Bool = false // TODO: http_should_keep_alive
@@ -1734,7 +1734,7 @@ public class HTTPParser {
   
   var messageNeedsEOF : Bool { // http_message_needs_eof()
     /* Does the parser need to see an EOF to find the end of the message? */
-    if type == .HTTP_REQUEST {
+    if type == .Request {
       return false
     }
     

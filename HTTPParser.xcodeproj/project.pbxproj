@@ -12,8 +12,6 @@
 		E80448271CCE4F6500447204 /* HTTPError.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448211CCE4F6500447204 /* HTTPError.swift */; };
 		E80448281CCE4F6500447204 /* HTTPMethod.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448221CCE4F6500447204 /* HTTPMethod.swift */; };
 		E80448291CCE4F6500447204 /* HTTPParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448231CCE4F6500447204 /* HTTPParser.swift */; };
-		E804482A1CCE4F6500447204 /* HTTPParserURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448241CCE4F6500447204 /* HTTPParserURL.swift */; };
-		E804482B1CCE4F6500447204 /* HTTPParserURLFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448251CCE4F6500447204 /* HTTPParserURLFields.swift */; };
 		E804482C1CCE4F6500447204 /* HTTPStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448261CCE4F6500447204 /* HTTPStatus.swift */; };
 		E80448481CCE5D1500447204 /* ascii.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448471CCE5D1500447204 /* ascii.swift */; };
 		E804484A1CCFA28D00447204 /* HTTPParserState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80448491CCFA28D00447204 /* HTTPParserState.swift */; };
@@ -40,8 +38,6 @@
 		E80448211CCE4F6500447204 /* HTTPError.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HTTPError.swift; path = Sources/HTTPParser/HTTPError.swift; sourceTree = SOURCE_ROOT; };
 		E80448221CCE4F6500447204 /* HTTPMethod.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HTTPMethod.swift; path = Sources/HTTPParser/HTTPMethod.swift; sourceTree = SOURCE_ROOT; };
 		E80448231CCE4F6500447204 /* HTTPParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HTTPParser.swift; path = Sources/HTTPParser/HTTPParser.swift; sourceTree = SOURCE_ROOT; };
-		E80448241CCE4F6500447204 /* HTTPParserURL.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HTTPParserURL.swift; path = Sources/HTTPParser/HTTPParserURL.swift; sourceTree = SOURCE_ROOT; };
-		E80448251CCE4F6500447204 /* HTTPParserURLFields.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HTTPParserURLFields.swift; path = Sources/HTTPParser/HTTPParserURLFields.swift; sourceTree = SOURCE_ROOT; };
 		E80448261CCE4F6500447204 /* HTTPStatus.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HTTPStatus.swift; path = Sources/HTTPParser/HTTPStatus.swift; sourceTree = SOURCE_ROOT; };
 		E804482E1CCE4F7800447204 /* AppKitBase.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = AppKitBase.xcconfig; sourceTree = "<group>"; };
 		E804482F1CCE4F7800447204 /* AppKitDebug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = AppKitDebug.xcconfig; sourceTree = "<group>"; };
@@ -115,8 +111,6 @@
 				E80448491CCFA28D00447204 /* HTTPParserState.swift */,
 				E80448211CCE4F6500447204 /* HTTPError.swift */,
 				E80448221CCE4F6500447204 /* HTTPMethod.swift */,
-				E80448241CCE4F6500447204 /* HTTPParserURL.swift */,
-				E80448251CCE4F6500447204 /* HTTPParserURLFields.swift */,
 				E80448261CCE4F6500447204 /* HTTPStatus.swift */,
 				E8921F881CCEA2B400E8611B /* URLParser.swift */,
 				E80448471CCE5D1500447204 /* ascii.swift */,
@@ -268,13 +262,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E804482B1CCE4F6500447204 /* HTTPParserURLFields.swift in Sources */,
 				E804484A1CCFA28D00447204 /* HTTPParserState.swift in Sources */,
 				E837E5231CD00B8C00794356 /* CString.swift in Sources */,
 				E80448281CCE4F6500447204 /* HTTPMethod.swift in Sources */,
 				E8921F891CCEA2B400E8611B /* URLParser.swift in Sources */,
 				E80448271CCE4F6500447204 /* HTTPError.swift in Sources */,
-				E804482A1CCE4F6500447204 /* HTTPParserURL.swift in Sources */,
 				E80448291CCE4F6500447204 /* HTTPParser.swift in Sources */,
 				E804482C1CCE4F6500447204 /* HTTPStatus.swift in Sources */,
 				E80448481CCE5D1500447204 /* ascii.swift in Sources */,
