@@ -33,7 +33,7 @@
 #endif
 
 let HTTP_PARSER_STRICT   = false
-let HTTP_MAX_HEADER_SIZE = (80*1024)
+let HTTP_MAX_HEADER_SIZE = (80 * 1024)
 
 let debugOn = false
 
@@ -46,56 +46,70 @@ public enum HTTPParserType {
   case HTTP_BOTH
 }
 
-typealias http_data_cb = ( HTTPParser, UnsafePointer<CChar>, size_t) -> Int
-typealias http_cb      = ( HTTPParser ) -> Int
+public typealias http_data_cb = ( HTTPParser, UnsafePointer<CChar>, size_t) -> Int
+public typealias http_cb      = ( HTTPParser ) -> Int
 
 public class HTTPParser {
+  // TBD: this could be a struct, except maybe for the callbacks - those would
+  //      need to take an inout parameter?
 
   // MARK: - http_parser
   
-  var type           : HTTPParserType
-  var flags          = HTTPParserOptions()
-  var state          : ParserState       = .s_dead
-  var header_state   : ParserHeaderState = .h_general
-  var index          : Int   = 0 // this is UInt8, but Int can be used as an idx
+  var type                  : HTTPParserType
+  var flags                 = HTTPParserOptions()
+  var state                 : ParserState       = .s_dead
+  var header_state          : ParserHeaderState = .h_general
+  var index                 : Int   = 0
+    // this is UInt8, but Int can be used as an idx
   
-  var nread          : Int   = 0
-  var content_length : Int   = 0
+  public var nread          : Int   = 0
+  public var content_length : Int   = 0
   
   // READ-ONLY
-  var http_major     : Int16?      = nil
-  var http_minor     : Int16?      = nil
-  var status_code    : Int16?      = nil // responses only
-  var method         : HTTPMethod! = nil // requests only
-  var error          : HTTPError   = .OK // use an optional for OK?
+  public var http_major     : Int16?      = nil
+  public var http_minor     : Int16?      = nil
+  public var status_code    : Int16?      = nil // responses only
+  public var method         : HTTPMethod! = nil // requests only
+  public var error          : HTTPError   = .OK // use an optional for OK?
 
-  var statusCode : HTTPStatus? {
+  public var statusCode : HTTPStatus? {
     guard let v = status_code else { return nil }
     return HTTPStatus(Int(v))
   }
   
-  var upgrade        = false
+  public var upgrade        = false
   
-  var data : Any? = nil
+  public var data : Any?    = nil // user data
   
   
   // MARK: - http_parser_settings (this is global in here, per execute in orig)
-  // TODO: make those funcs with trailing args + vars
-  var onMessageBegin    : http_cb?      = nil
-  var onURL             : http_data_cb? = nil
-  var onStatus          : http_data_cb? = nil
-  var onHeaderField     : http_data_cb? = nil
-  var onHeaderValue     : http_data_cb? = nil
-  var onHeadersComplete : http_cb?      = nil
-  var onBody            : http_data_cb? = nil
-  var onMessageComplete : http_cb?      = nil
+  
+  var cbMessageBegin    : http_cb?      = nil
+  var cbURL             : http_data_cb? = nil
+  var cbStatus          : http_data_cb? = nil
+  var cbHeaderField     : http_data_cb? = nil
+  var cbHeaderValue     : http_data_cb? = nil
+  var cbHeadersComplete : http_cb?      = nil
+  var cbBody            : http_data_cb? = nil
+  var cbMessageComplete : http_cb?      = nil
   
   /* When on_chunk_header is called, the current chunk length is stored
    * in parser->content_length.
    */
-  var onChunkHeader     : http_cb? = nil
-  var onChunkComplete   : http_cb? = nil
-  
+  var cbChunkHeader     : http_cb? = nil
+  var cbChunkComplete   : http_cb? = nil
+
+  public func onMessageBegin   (cb: http_cb)      { cbMessageBegin    = cb }
+  public func onURL            (cb: http_data_cb) { cbURL             = cb }
+  public func onStatus         (cb: http_data_cb) { cbStatus          = cb }
+  public func onHeaderField    (cb: http_data_cb) { cbHeaderField     = cb }
+  public func onHeaderValue    (cb: http_data_cb) { cbHeaderValue     = cb }
+  public func onHeadersComplete(cb: http_cb)      { cbHeadersComplete = cb }
+  public func onBody           (cb: http_data_cb) { cbBody            = cb }
+  public func onMessageComplete(cb: http_cb)      { cbMessageComplete = cb }
+  public func onChunkHeader    (cb: http_cb)      { cbChunkHeader     = cb }
+  public func onChunkComplete  (cb: http_cb)      { cbChunkComplete   = cb }
+
   
   // MARK: - Init
   
@@ -104,6 +118,37 @@ public class HTTPParser {
     
     // start_state
     self.state = startState
+  }
+
+  public func reset() {
+    self.type              = .HTTP_BOTH
+    self.flags             = HTTPParserOptions()
+    self.state             = .s_dead
+    self.header_state      = .h_general
+    self.index             = 0
+    self.nread             = 0
+    self.content_length    = 0
+  
+    self.http_major        = nil
+    self.http_minor        = nil
+    self.status_code       = nil
+    self.method            = nil
+    self.error             = .OK
+  
+    self.upgrade           = false
+  
+    self.data              = nil
+  
+    self.cbMessageBegin    = nil
+    self.cbURL             = nil
+    self.cbStatus          = nil
+    self.cbHeaderField     = nil
+    self.cbHeaderValue     = nil
+    self.cbHeadersComplete = nil
+    self.cbBody            = nil
+    self.cbMessageComplete = nil
+    self.cbChunkHeader     = nil
+    self.cbChunkComplete   = nil
   }
   
   // MARK: - Callbacks
@@ -144,11 +189,11 @@ public class HTTPParser {
   {
     let cb : http_cb!
     switch cbe {
-      case .MessageBegin:    cb = self.onMessageBegin
-      case .HeadersComplete: cb = self.onHeadersComplete
-      case .MessageComplete: cb = self.onMessageComplete
-      case .ChunkHeader:     cb = self.onChunkHeader
-      case .ChunkComplete:   cb = self.onChunkComplete
+      case .MessageBegin:    cb = self.cbMessageBegin
+      case .HeadersComplete: cb = self.cbHeadersComplete
+      case .MessageComplete: cb = self.cbMessageComplete
+      case .ChunkHeader:     cb = self.cbChunkHeader
+      case .ChunkComplete:   cb = self.cbChunkComplete
       default: assert(false, "incorrect CB");  cb = nil
     }
     
@@ -199,11 +244,11 @@ public class HTTPParser {
     if mark != nil {
       let cb : http_data_cb!
       switch cbe {
-        case .URL:         cb = onURL
-        case .Status:      cb = onStatus
-        case .HeaderField: cb = onHeaderField
-        case .HeaderValue: cb = onHeaderValue
-        case .Body:        cb = onBody
+        case .URL:         cb = self.cbURL
+        case .Status:      cb = self.cbStatus
+        case .HeaderField: cb = self.cbHeaderField
+        case .HeaderValue: cb = self.cbHeaderValue
+        case .Body:        cb = self.cbBody
         default: assert(false, "incorrect CB"); cb = nil
       }
       
@@ -1272,7 +1317,7 @@ public class HTTPParser {
            * We'd like to use CALLBACK_NOTIFY_NOADVANCE() here but we cannot, so
            * we have to simulate it by handling a change in errno below.
            */
-          if let cb = onHeadersComplete {
+          if let cb = self.cbHeadersComplete {
             switch cb(self) {
               case 0:
                 break;
