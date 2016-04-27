@@ -58,7 +58,6 @@
 		E80448491CCFA28D00447204 /* HTTPParserState.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HTTPParserState.swift; path = Sources/HTTPParser/HTTPParserState.swift; sourceTree = SOURCE_ROOT; };
 		E837E5221CD00B8C00794356 /* CString.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = CString.swift; path = Sources/HTTPParser/CString.swift; sourceTree = SOURCE_ROOT; };
 		E8921F881CCEA2B400E8611B /* URLParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = URLParser.swift; path = Sources/HTTPParser/URLParser.swift; sourceTree = SOURCE_ROOT; };
-		E8921F8A1CCEC9C900E8611B /* SwiftNotes.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SwiftNotes.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -83,7 +82,6 @@
 		E80447FB1CCE4ECD00447204 = {
 			isa = PBXGroup;
 			children = (
-				E8921F8A1CCEC9C900E8611B /* SwiftNotes.md */,
 				E804483A1CCE4F8B00447204 /* README.md */,
 				E80448381CCE4F8400447204 /* AUTHORS */,
 				E804483C1CCE4F9100447204 /* LICENSE-MIT */,
