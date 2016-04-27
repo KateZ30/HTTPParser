@@ -52,8 +52,6 @@
 		E80448381CCE4F8400447204 /* AUTHORS */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = AUTHORS; sourceTree = "<group>"; };
 		E804483A1CCE4F8B00447204 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		E804483C1CCE4F9100447204 /* LICENSE-MIT */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "LICENSE-MIT"; sourceTree = "<group>"; };
-		E80448451CCE55A900447204 /* http_parser.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = http_parser.c; sourceTree = "<group>"; };
-		E80448461CCE55A900447204 /* http_parser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = http_parser.h; sourceTree = "<group>"; };
 		E80448471CCE5D1500447204 /* ascii.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ascii.swift; path = Sources/HTTPParser/ascii.swift; sourceTree = SOURCE_ROOT; };
 		E80448491CCFA28D00447204 /* HTTPParserState.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HTTPParserState.swift; path = Sources/HTTPParser/HTTPParserState.swift; sourceTree = SOURCE_ROOT; };
 		E837E5221CD00B8C00794356 /* CString.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = CString.swift; path = Sources/HTTPParser/CString.swift; sourceTree = SOURCE_ROOT; };
@@ -85,7 +83,6 @@
 				E804483A1CCE4F8B00447204 /* README.md */,
 				E80448381CCE4F8400447204 /* AUTHORS */,
 				E804483C1CCE4F9100447204 /* LICENSE-MIT */,
-				E80448441CCE559600447204 /* Original C Parser */,
 				E80448071CCE4ECD00447204 /* HTTPParser */,
 				E80448131CCE4ECD00447204 /* HTTPParserTests */,
 				E80448061CCE4ECD00447204 /* Products */,
@@ -142,15 +139,6 @@
 				E80448371CCE4F7800447204 /* UIKitRelease.xcconfig */,
 			);
 			path = xcconfig;
-			sourceTree = "<group>";
-		};
-		E80448441CCE559600447204 /* Original C Parser */ = {
-			isa = PBXGroup;
-			children = (
-				E80448461CCE55A900447204 /* http_parser.h */,
-				E80448451CCE55A900447204 /* http_parser.c */,
-			);
-			name = "Original C Parser";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
