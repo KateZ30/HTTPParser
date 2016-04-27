@@ -86,9 +86,9 @@ if recved < 0 {
  */
 nparsed = parser.execute(buf, recved);
 
-if (parser.upgrade) {
+if parser.upgrade {
   /* handle new protocol */
-} else if (nparsed != recved) {
+} else if nparsed != recved {
   /* Handle error. Usually just close the connection. */
 }
 ```
