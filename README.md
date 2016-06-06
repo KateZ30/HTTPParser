@@ -40,7 +40,7 @@ An attempt was made to keep it close to the original, which results in quite
 ugly Swift, but well. The idea is to make it easier to patch in upstream changes
 to the C parser.
 
-Example usage: [Noze.io](http://noze.io/)
+Example usage: [Noze.io](http://noze.io/).
 
 Differences:
 - callbacks are replaced with closures, which are attached to the parser
