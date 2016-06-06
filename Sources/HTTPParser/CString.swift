@@ -18,17 +18,34 @@
 extension String {
   
   func makeCString() -> UnsafePointer<CChar> {
-    var ptr : UnsafeMutablePointer<CChar> = nil
-    self.withCString { cstr in
-      let len = strlen(cstr)
-      ptr = UnsafeMutablePointer<CChar>.alloc(Int(len) + 1)
-      strcpy(ptr, cstr)
-    }
-    return UnsafePointer<CChar>(ptr)
+    let mp = self.withCString { cstr in strdup(cstr) }
+#if swift(>=3.0) // #swift3-ptr
+    return UnsafePointer<CChar>(mp!)
+      // a non-opt string always results in at least ""
+#else
+    return UnsafePointer<CChar>(mp)
+#endif
   }
   
-  static func fromCString(cs: UnsafePointer<CChar>, length: Int!) -> String? {
-    guard length != .None else { // no length given, use \0 standard variant
+#if swift(>=3.0) // #swift3-cstr
+  static func fromCString(_ cs: UnsafePointer<CChar>, length olength: Int?) -> String? {
+    guard let length = olength else { // no length given, use \0 std imp
+      return String(validatingUTF8: cs)
+    }
+    
+    let buflen = length + 1
+    let buf    = UnsafeMutablePointer<CChar>(allocatingCapacity: buflen)
+    memcpy(buf, cs, length)
+    buf[length] = 0 // zero terminate
+
+    let s = String(validatingUTF8: buf)
+    buf.deallocateCapacity(buflen)
+
+    return s
+  }
+#else
+  static func fromCString(cs: UnsafePointer<CChar>, length olength: Int?) -> String? {
+    guard let length = olength else { // no length given, use \0 std imp
       return String.fromCString(cs)
     }
     
@@ -36,9 +53,10 @@ extension String {
     let buf    = UnsafeMutablePointer<CChar>.alloc(buflen)
     memcpy(buf, cs, length)
     buf[length] = 0 // zero terminate
+
     let s = String.fromCString(buf)
     buf.dealloc(buflen)
     return s
   }
-
+#endif
 }

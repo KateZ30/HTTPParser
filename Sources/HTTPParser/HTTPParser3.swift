@@ -27,10 +27,6 @@
  */
 
 #if swift(>=3.0) // #swift3-inout
-#else
-  
-// TODO: STRICT_CHECK and HEADER_OVERFLOW are ignored. Fix like in Swift 3
-//       parser (guards, return error)
 
 #if os(Linux)
   import Glibc
@@ -188,9 +184,9 @@ public class HTTPParser {
   // FIXME: the error codes are wrong
   
   /// Run the notify callback FOR, returning ER if it fails
-  func CALLBACK_NOTIFY_(cbe: Callback,
-                        inout _ CURRENT_STATE : ParserState,
-                        _ ER: size_t)
+  func CALLBACK_NOTIFY_(_ cbe           : Callback,
+                        _ CURRENT_STATE : inout ParserState,
+                        _ ER            : size_t)
        -> size_t?
   {
     let cb : http_cb!
@@ -214,24 +210,36 @@ public class HTTPParser {
   }
   
   /// Run the notify callback FOR and consume the current byte
-  func CALLBACK_NOTIFY(cb: Callback,
-                       inout _ CURRENT_STATE : ParserState,
-                       _ p:    UnsafePointer<CChar>,
-                       _ data: UnsafePointer<CChar>)
+  func CALLBACK_NOTIFY(_ cb            : Callback,
+                       _ CURRENT_STATE : inout ParserState,
+                       _ p:    UnsafePointer<CChar>?,
+                       _ data: UnsafePointer<CChar>?)
     -> size_t?
   {
-    let len = p - data + 1
+    let len : Int
+    if let p = p, data = data {
+      len = p - data + 1
+    }
+    else {
+      len = 0
+    }
     return CALLBACK_NOTIFY_(cb, &CURRENT_STATE, len)
   }
   
   /// Run the notify callback FOR and don't consume the current byte
-  func CALLBACK_NOTIFY_NOADVANCE(cb: Callback,
-                                 inout _ CURRENT_STATE : ParserState,
-                                 _ p:    UnsafePointer<CChar>,
-                                 _ data: UnsafePointer<CChar>)
+  func CALLBACK_NOTIFY_NOADVANCE(_ cb            : Callback,
+                                 _ CURRENT_STATE : inout ParserState,
+                                 _ p:    UnsafePointer<CChar>?,
+                                 _ data: UnsafePointer<CChar>?)
     -> size_t?
   {
-    let len = p - data
+    let len : Int
+    if let p = p, data = data {
+      len = p - data
+    }
+    else {
+      len = 0
+    }
     return CALLBACK_NOTIFY_(cb, &CURRENT_STATE, len)
   }
   
@@ -239,9 +247,9 @@ public class HTTPParser {
   //      directly patch the `mark`
   
   /// Run data callback FOR with LEN bytes, returning ER if it fails
-  func CALLBACK_DATA_(cbe: Callback,
-                      inout _ mark : UnsafePointer<CChar>,
-                      inout _ CURRENT_STATE : ParserState,
+  func CALLBACK_DATA_(_ cbe           : Callback,
+                      _ mark          : inout UnsafePointer<CChar>?,
+                      _ CURRENT_STATE : inout ParserState,
                       _ len: size_t, _ ER: size_t)
        -> size_t?
   {
@@ -260,7 +268,7 @@ public class HTTPParser {
       
       if let cb = cb {
         self.state = CURRENT_STATE
-        if 0 != cb(self, mark, len) {
+        if 0 != cb(self, mark!, len) {
           error = cbe.callbackError
         }
         CURRENT_STATE = self.state // in case the CB patched it
@@ -278,22 +286,32 @@ public class HTTPParser {
   }
   
   /// Run the data callback FOR and consume the current byte
-  func CALLBACK_DATA(cb: Callback,
-                     inout _ mark : UnsafePointer<CChar>,
-                     inout _ CURRENT_STATE : ParserState,
-                     _ p:    UnsafePointer<CChar>,
-                     _ data: UnsafePointer<CChar>) -> size_t?
+  func CALLBACK_DATA(_ cb            : Callback,
+                     _ mark          : inout UnsafePointer<CChar>?,
+                     _ CURRENT_STATE : inout ParserState,
+                     _ p:    UnsafePointer<CChar>?,
+                     _ data: UnsafePointer<CChar>?) -> size_t?
   {
-    return CALLBACK_DATA_(cb, &mark, &CURRENT_STATE, p - mark, p - data + 1)
+    let len : size_t, er : size_t
+    if let p = p, mark = mark { len = p - mark }
+    else { len = 0 }
+    if let p = p, data = data { er = p - data + 1 }
+    else { er = 0 }
+    return CALLBACK_DATA_(cb, &mark, &CURRENT_STATE, len, er)
   }
   /// Run the data callback FOR and consume the current byte
-  func CALLBACK_DATA_NOADVANCE(cb: Callback,
-                     inout _ mark : UnsafePointer<CChar>,
-                     inout _ CURRENT_STATE : ParserState,
-                     _ p:    UnsafePointer<CChar>,
-                     _ data: UnsafePointer<CChar>) -> size_t?
+  func CALLBACK_DATA_NOADVANCE(_ cb: Callback,
+                               _ mark : inout UnsafePointer<CChar>?,
+                               _ CURRENT_STATE : inout ParserState,
+                               _ p:    UnsafePointer<CChar>?,
+                               _ data: UnsafePointer<CChar>?) -> size_t?
   {
-    return CALLBACK_DATA_(cb, &mark, &CURRENT_STATE, p - mark, p - data)
+    let len : size_t, er : size_t
+    if let p = p, mark = mark { len = p - mark }
+    else { len = 0 }
+    if let p = p, data = data { er = p - data }
+    else { er = 0 }
+    return CALLBACK_DATA_(cb, &mark, &CURRENT_STATE, len, er)
   }
   
   
@@ -301,7 +319,7 @@ public class HTTPParser {
   
   /// Executes the parser. Returns number of parsed bytes. Sets
   /// `error` on error.
-  public func execute(data: UnsafePointer<CChar>, _ len: size_t) -> size_t {
+  public func execute(_ data: UnsafePointer<CChar>?, _ len: size_t) -> size_t {
     /* We're in an error state. Don't bother doing anything. */
     guard error == .OK else { return 0 }
     
@@ -335,11 +353,11 @@ public class HTTPParser {
     
     // collect data markers
     
-    var header_field_mark : UnsafePointer<CChar> = nil
-    var header_value_mark : UnsafePointer<CChar> = nil
-    var url_mark          : UnsafePointer<CChar> = nil
-    var body_mark         : UnsafePointer<CChar> = nil
-    var status_mark       : UnsafePointer<CChar> = nil
+    var header_field_mark : UnsafePointer<CChar>? = nil
+    var header_value_mark : UnsafePointer<CChar>? = nil
+    var url_mark          : UnsafePointer<CChar>? = nil
+    var body_mark         : UnsafePointer<CChar>? = nil
+    var status_mark       : UnsafePointer<CChar>? = nil
     
     switch CURRENT_STATE {
       case .s_header_field: header_field_mark = data
@@ -355,7 +373,7 @@ public class HTTPParser {
       default: break
     }
     
-    func MARK(cbe: Callback /*, p : UnsafePointer<CChar> = p */) {
+    func MARK(_ cbe: Callback /*, p : UnsafePointer<CChar> = p */) {
       // Note: argument crashes swiftc 2.2
       // #define MARK(FOR) if (!FOR##_mark)  FOR##_mark = p;
       if debugOn { print("  MARK \(cbe)") }
@@ -372,13 +390,13 @@ public class HTTPParser {
     }
     
     /// transfer `CURRENT_STATE` to `state` ivar and return the given value
-    func RETURN(V: size_t) -> size_t {
+    func RETURN(_ V: size_t) -> size_t {
       if debugOn { print("RETURN old \(self.state) new \(CURRENT_STATE)") }
       self.state = CURRENT_STATE
       return V
     }
     
-    func UPDATE_STATE(state: ParserState) {
+    func UPDATE_STATE(_ state: ParserState) {
       if debugOn { print("  UPDATE_STATE \(CURRENT_STATE) => \(state)") }
       CURRENT_STATE = state
     }
@@ -403,13 +421,13 @@ public class HTTPParser {
     
     // REEXECUTE macro:
     //   if let len = gotoReexecute() { return len } // error?
-    func step(ch: CChar) -> StepResult {
+    func step(_ ch: CChar) -> StepResult {
       /* reexecute: label */
 
       if debugOn {
         print("\n<---------------------------------------")
-        print("STEP PROCESS=\(debugChar(ch)) len=\(p - data) " +
-              "STATE=\(CURRENT_STATE)")
+        print("STEP \(debugChar(ch)) len=\(p! - data!) " +
+              "\(CURRENT_STATE)")
 
         if CURRENT_STATE == .s_header_field {
           print("xxx HEADER FIELD")
@@ -421,7 +439,7 @@ public class HTTPParser {
             print("xxx HEADER FIELD")
           }
           
-          print("DONE \(debugChar(ch)) len=\(p - data) " +
+          print("DONE \(debugChar(ch)) len=\(p! - data!) " +
                 "\(CURRENT_STATE) \(self.error)")
           print("\n>---------------------------------------")
         }
@@ -482,19 +500,19 @@ public class HTTPParser {
           if let len = len { return .CallbackDone(len) }
         
         case .s_res_H:
-          STRICT_CHECK(ch != cT)
+          guard STRICT_CHECK(ch != cT) else { return .Error(.STRICT) }
           UPDATE_STATE(.s_res_HT)
 
         case .s_res_HT:
-          STRICT_CHECK(ch != cT)
+          guard STRICT_CHECK(ch != cT) else { return .Error(.STRICT) }
           UPDATE_STATE(.s_res_HTT)
 
         case .s_res_HTT:
-          STRICT_CHECK(ch != cP)
+          guard STRICT_CHECK(ch != cP) else { return .Error(.STRICT) }
           UPDATE_STATE(.s_res_HTTP)
 
         case .s_res_HTTP:
-          STRICT_CHECK(ch != cSLASH)
+          guard STRICT_CHECK(ch != cSLASH) else { return .Error(.STRICT) }
           UPDATE_STATE(.s_res_first_http_major)
           break;
 
@@ -593,7 +611,7 @@ public class HTTPParser {
           }
 
         case .s_res_line_almost_done:
-          STRICT_CHECK(ch != LF)
+          guard STRICT_CHECK(ch != LF) else { return .Error(.STRICT) }
           UPDATE_STATE(.s_header_field_start)
 
         case .s_start_req:
@@ -793,19 +811,19 @@ public class HTTPParser {
           }
         
         case .s_req_http_H:
-          STRICT_CHECK(ch != cT)
+          guard STRICT_CHECK(ch != cT) else { return .Error(.STRICT) }
           UPDATE_STATE(.s_req_http_HT)
 
         case .s_req_http_HT:
-          STRICT_CHECK(ch != cT)
+          guard STRICT_CHECK(ch != cT) else { return .Error(.STRICT) }
           UPDATE_STATE(.s_req_http_HTT)
 
         case .s_req_http_HTT:
-          STRICT_CHECK(ch != cP)
+          guard STRICT_CHECK(ch != cP) else { return .Error(.STRICT) }
           UPDATE_STATE(.s_req_http_HTTP)
 
         case .s_req_http_HTTP:
-          STRICT_CHECK(ch != cSLASH)
+          guard STRICT_CHECK(ch != cSLASH) else { return .Error(.STRICT) }
           UPDATE_STATE(.s_req_first_http_major)
 
         /* first digit of major HTTP version */
@@ -853,7 +871,7 @@ public class HTTPParser {
         /* end of request line */
         case .s_req_line_almost_done:
           guard ch == LF else { return .Error(.LF_EXPECTED) }
-          UPDATE_STATE(.s_header_field_start)
+          UPDATE_STATE(.s_header_field_start);
 
         case .s_header_field_start:
           if ch == CR { UPDATE_STATE(.s_headers_almost_done); break }
@@ -885,20 +903,9 @@ public class HTTPParser {
         case .s_header_field:
           let start = p
           
-          if debugOn {
-            print("  .s_header_field: \(header_state) CH: \(debugChar(ch))")
-          }
-          
-          var ch = p.memory // needs to be outside of the loop!
-          
-          while p != (data + len) {
-            if debugOn {
-              let s = String.fromCString(start, length: (p - start))!
-              print("    .s_header_field \(header_state)" +
-                    " H: \(s) CH: \(debugChar(ch))")
-            }
-            
-            ch = p.memory
+          var ch = p!.pointee // needs to be outside of the loop!
+          while p != (data! + len) {
+            ch = p!.pointee
             let c = TOKEN(ch)
             if  c == 0 { break }
 
@@ -984,24 +991,21 @@ public class HTTPParser {
                 assert(false, "Unknown header_state")
             }
             
-            p += 1
-          }
-          if debugOn {
-            let s = String.fromCString(start, length: (p - start))!
-            print("  .s_header_field LOOP DONE \(header_state) " +
-                  "H: \(s) CH: \(debugChar(ch))")
+            p! += 1
           }
 
-          COUNT_HEADER_SIZE(p - start)
+          guard COUNT_HEADER_SIZE(p! - start!) else {
+            return .Error(.HEADER_OVERFLOW)
+          }
 
-          if p == data + len {
-            p -= 1
+          if p == data! + len {
+            p! -= 1
             break
           }
           
           if debugOn {
-            let s = String.fromCString(header_field_mark,
-                                       length: (p - header_field_mark))!
+            let s = String.fromCString(header_field_mark!,
+                                       length: (p! - header_field_mark!))!
             print("  H: \(s) CH: \(debugChar(ch))")
           }
 
@@ -1042,7 +1046,7 @@ public class HTTPParser {
 
           switch self.header_state {
             case .h_upgrade:
-              self.flags.insert(.F_UPGRADE)
+              _ = self.flags.insert(.F_UPGRADE)
               self.header_state = .h_general;
 
             case .h_transfer_encoding:
@@ -1080,8 +1084,8 @@ public class HTTPParser {
           let start   = p
           var h_state = self.header_state
           
-          while p != data + len {
-            let ch = p.memory
+          while p != data! + len {
+            let ch = p!.pointee
             
             if ch == CR {
               UPDATE_STATE(.s_header_almost_done);
@@ -1095,7 +1099,9 @@ public class HTTPParser {
 
             if ch == LF {
               UPDATE_STATE(.s_header_almost_done);
-              COUNT_HEADER_SIZE(p - start);
+              guard COUNT_HEADER_SIZE(p! - start!) else {
+                return .Error(.HEADER_OVERFLOW)
+              }
               self.header_state = h_state;
               // CALLBACK_DATA_NOADVANCE(header_value);
               let rc = CALLBACK_DATA_NOADVANCE(.HeaderValue,
@@ -1110,14 +1116,19 @@ public class HTTPParser {
 
             switch h_state {
               case .h_general:
-                var limit : size_t = data + len - p;
+                var limit : size_t = data! + len - p!;
 
                 limit = min(limit, HTTP_MAX_HEADER_SIZE);
 
                 // p_cr = (const char*) memchr(p, CR, limit);
                 // p_lf = (const char*) memchr(p, LF, limit);
+#if os(Linux)
+                let p_cr = UnsafePointer<CChar>(memchr(p!, Int32(CR), limit))
+                let p_lf = UnsafePointer<CChar>(memchr(p!, Int32(LF), limit))
+#else
                 let p_cr = UnsafePointer<CChar>(memchr(p, Int32(CR), limit))
                 let p_lf = UnsafePointer<CChar>(memchr(p, Int32(LF), limit))
+#endif
                 if p_cr != nil {
                   if p_lf != nil && p_cr >= p_lf {
                     p = p_lf
@@ -1127,9 +1138,9 @@ public class HTTPParser {
                 } else if p_lf != nil {
                   p = p_lf
                 } else {
-                  p = data + len;
+                  p = data! + len;
                 }
-                p -= 1
+                p! -= 1
 
               case .h_connection,
                    .h_transfer_encoding:
@@ -1223,11 +1234,11 @@ public class HTTPParser {
                    .h_connection_upgrade:
                 if ch == cCOMMA {
                   if h_state == .h_connection_keep_alive {
-                    self.flags.insert(.F_CONNECTION_KEEP_ALIVE)
+                    _ = self.flags.insert(.F_CONNECTION_KEEP_ALIVE)
                   } else if h_state == .h_connection_close {
-                    self.flags.insert(.F_CONNECTION_CLOSE)
+                    _ = self.flags.insert(.F_CONNECTION_CLOSE)
                   } else if h_state == .h_connection_upgrade {
-                    self.flags.insert(.F_CONNECTION_UPGRADE)
+                    _ = self.flags.insert(.F_CONNECTION_UPGRADE)
                   }
                   h_state = .h_matching_connection_token_start
                   self.index = 0;
@@ -1240,18 +1251,20 @@ public class HTTPParser {
                 h_state = .h_general
             }
             
-            p += 1
+            p! += 1
           }
           self.header_state = h_state;
 
-          COUNT_HEADER_SIZE(p - start);
+          guard COUNT_HEADER_SIZE(p! - start!) else {
+            return .Error(.HEADER_OVERFLOW)
+          }
 
-          if (p == data + len) {
-            p -= 1
+          if (p == data! + len) {
+            p! -= 1
           }
 
         case .s_header_almost_done:
-          STRICT_CHECK(ch != LF)
+          guard STRICT_CHECK(ch != LF) else { return .Error(.STRICT) }
           UPDATE_STATE(.s_header_value_lws)
           
         case .s_header_value_lws:
@@ -1263,13 +1276,13 @@ public class HTTPParser {
           /* finished the header */
           switch self.header_state {
             case .h_connection_keep_alive:
-              self.flags.insert(.F_CONNECTION_KEEP_ALIVE)
+              _ = self.flags.insert(.F_CONNECTION_KEEP_ALIVE)
             case .h_connection_close:
-              self.flags.insert(.F_CONNECTION_CLOSE)
+              _ = self.flags.insert(.F_CONNECTION_CLOSE)
             case .h_transfer_encoding_chunked:
-              self.flags.insert(.F_CHUNKED)
+              _ = self.flags.insert(.F_CHUNKED)
             case .h_connection_upgrade:
-              self.flags.insert(.F_CONNECTION_UPGRADE)
+              _ = self.flags.insert(.F_CONNECTION_UPGRADE)
             default: break;
           }
 
@@ -1277,7 +1290,7 @@ public class HTTPParser {
           return .Reexecute
 
         case .s_header_value_discard_ws_almost_done:
-          STRICT_CHECK(ch != LF)
+          guard STRICT_CHECK(ch != LF) else { return .Error(.STRICT) }
           UPDATE_STATE(.s_header_value_discard_lws)
 
         case .s_header_value_discard_lws:
@@ -1287,13 +1300,13 @@ public class HTTPParser {
           } else {
             switch self.header_state {
               case .h_connection_keep_alive:
-                self.flags.insert(.F_CONNECTION_KEEP_ALIVE)
+                _ = self.flags.insert(.F_CONNECTION_KEEP_ALIVE)
               case .h_connection_close:
-                self.flags.insert(.F_CONNECTION_CLOSE)
+                _ = self.flags.insert(.F_CONNECTION_CLOSE)
               case .h_connection_upgrade:
-                self.flags.insert(.F_CONNECTION_UPGRADE)
+                _ = self.flags.insert(.F_CONNECTION_UPGRADE)
               case .h_transfer_encoding_chunked:
-                self.flags.insert(.F_CHUNKED)
+                _ = self.flags.insert(.F_CHUNKED)
               default: break
             }
 
@@ -1310,7 +1323,7 @@ public class HTTPParser {
           }
 
         case .s_headers_almost_done:
-          STRICT_CHECK(ch != LF)
+          guard STRICT_CHECK(ch != LF) else { return .Error(.STRICT) }
 
           if self.flags.contains(.F_TRAILING) {
             /* End of a chunked request */
@@ -1345,21 +1358,21 @@ public class HTTPParser {
                 break;
 
               case 1:
-                self.flags.insert(.F_SKIPBODY)
+                _ = self.flags.insert(.F_SKIPBODY)
                 break;
 
               default:
                 error = .CB_headers_complete
-                return .Return(p - data)
+                return .Return(p! - data!)
             }
           }
           
-          guard error == .OK else { return .Return(p - data)}
+          guard error == .OK else { return .Return(p! - data!)}
           
           return .Reexecute
 
         case .s_headers_done:
-          STRICT_CHECK(ch != LF);
+          guard STRICT_CHECK(ch != LF) else { return .Error(.STRICT) }
 
           self.nread = 0
 
@@ -1376,7 +1389,7 @@ public class HTTPParser {
             let rc = CALLBACK_NOTIFY(.MessageComplete, &CURRENT_STATE,
                                       p, data)
             if let rc = rc { return .CallbackDone(rc) }
-            return .Return((p - data) + 1)
+            return .Return((p! - data!) + 1)
           }
 
           if self.flags.contains(.F_SKIPBODY) {
@@ -1416,7 +1429,7 @@ public class HTTPParser {
 
         case .s_body_identity:
           let to_read : Int /* uint64_t */ = min(self.content_length,
-                                       ((data + len) - p));
+                                       ((data! + len) - p!));
 
           assert(self.content_length != 0
               && self.content_length != Int.max /* ULLONG_MAX */);
@@ -1429,7 +1442,7 @@ public class HTTPParser {
           MARK(.Body)
 
           self.content_length -= to_read;
-          p += to_read - 1;
+          p! += to_read - 1;
 
           if (self.content_length == 0) {
             UPDATE_STATE(.s_message_done);
@@ -1444,7 +1457,7 @@ public class HTTPParser {
              * important for applications, but let's keep it for now.
              */
             let rc = CALLBACK_DATA_(.Body, &body_mark, &CURRENT_STATE,
-                                    p - body_mark + 1, p - data)
+                                    p! - body_mark! + 1, p! - data!)
             if let rc = rc { return .CallbackDone(rc) }
             
             return .Reexecute
@@ -1454,7 +1467,7 @@ public class HTTPParser {
         /* read until EOF */
         case .s_body_identity_eof:
           MARK(.Body)
-          p = data + len - 1;
+          p = data! + len - 1;
         
         case .s_message_done:
           UPDATE_STATE(NEW_MESSAGE)
@@ -1466,7 +1479,7 @@ public class HTTPParser {
           
           if self.upgrade {
             /* Exit, the rest of the message is in a different protocol. */
-            return .Return((p - data) + 1)
+            return .Return((p! - data!) + 1)
           }
 
         case .s_chunk_size_start:
@@ -1517,12 +1530,12 @@ public class HTTPParser {
 
         case .s_chunk_size_almost_done:
           assert(self.flags.contains(.F_CHUNKED))
-          STRICT_CHECK(ch != LF)
+          guard STRICT_CHECK(ch != LF) else { return .Error(.STRICT) }
 
           self.nread = 0;
 
           if (self.content_length == 0) {
-            self.flags.insert(.F_TRAILING)
+            _ = self.flags.insert(.F_TRAILING)
             UPDATE_STATE(.s_header_field_start)
           } else {
             UPDATE_STATE(.s_chunk_data)
@@ -1533,7 +1546,7 @@ public class HTTPParser {
           if let rc = rc { return .CallbackDone(rc) }
 
         case .s_chunk_data:
-          let to_read = min(self.content_length, ((data + len) - p))
+          let to_read = min(self.content_length, ((data! + len) - p!))
 
           assert(self.flags.contains(.F_CHUNKED))
           assert(self.content_length != 0
@@ -1544,7 +1557,7 @@ public class HTTPParser {
            */
           MARK(.Body)
           self.content_length -= to_read;
-          p += to_read - 1;
+          p! += to_read - 1;
 
           if self.content_length == 0 {
             UPDATE_STATE(.s_chunk_data_almost_done);
@@ -1553,17 +1566,17 @@ public class HTTPParser {
         case .s_chunk_data_almost_done:
           assert(self.flags.contains(.F_CHUNKED))
           assert(self.content_length == 0)
-          STRICT_CHECK(ch != CR)
+          guard STRICT_CHECK(ch != CR) else { return .Error(.STRICT) }
           UPDATE_STATE(.s_chunk_data_done);
           
           // CALLBACK_DATA(body);
           let rc = CALLBACK_DATA_(.Body, &body_mark, &CURRENT_STATE,
-                                  p - body_mark + 1, p - data)
+                                  p! - body_mark! + 1, p! - data!)
           if let rc = rc { return .CallbackDone(rc) }
 
         case .s_chunk_data_done:
           assert(self.flags.contains(.F_CHUNKED))
-          STRICT_CHECK(ch != LF);
+          guard STRICT_CHECK(ch != LF) else { return .Error(.STRICT) }
           self.nread = 0
           UPDATE_STATE(.s_chunk_size_start);
           
@@ -1585,25 +1598,25 @@ public class HTTPParser {
     /* the main loop */
     
     assert(p == data)
-    if debugOn { print("START LOOP len=\(p - data) \(CURRENT_STATE)") }
-    while p != (data + len) {
-      let ch = p.memory
+    if debugOn { print("START LOOP len=\(p! - data!) \(CURRENT_STATE)") }
+    while p! != (data! + len) {
+      let ch = p!.pointee
       
       if debugOn {
-        let s = String.fromCString(data, length: p-data)!
+        let s = String.fromCString(data!, length: p! - data!)!
         let sq = String(s.characters.map {
           if $0 == "\r" { return "#" }
           if $0 == "\n" { return "#" }
           return $0
         })
         print("\n+  LOOP CHAR \(debugChar(ch)) '\(sq)'"
-              + " len=\(p - data) STATE=\(CURRENT_STATE)")
+              + " len=\(p! - data!) \(CURRENT_STATE)")
       }
       
       if CURRENT_STATE.isParsingHeader {
         if !COUNT_HEADER_SIZE(1) {
           if self.error == .OK { self.error = .UNKNOWN }
-          return RETURN(p - data) // size consumed
+          return RETURN(p! - data!) // size consumed
         }
       }
       
@@ -1615,20 +1628,20 @@ public class HTTPParser {
         switch rc {
           case .Continue:
             if debugOn {
-              print("  CONTINUE DID-PROCESS=\(debugChar(ch)) " +
-                    "len=\(p - data) STATE=\(CURRENT_STATE)")
+              print("  CONTINUE \(debugChar(ch)) " +
+                    "len=\(p! - data!) \(CURRENT_STATE)")
             }
           
           case .Reexecute:
             if debugOn {
               print("  REEXECUTE \(debugChar(ch)) " +
-                    "len=\(p - data) \(CURRENT_STATE)")
+                    "len=\(p! - data!) \(CURRENT_STATE)")
             }
           
           case .CallbackDone(let ER): // the C CALLBACK macros directly return
             if debugOn {
               print("  CALLBACK DONE \(debugChar(ch)) " +
-                    "ER=\(ER) len=\(p - data) \(CURRENT_STATE)")
+                    "ER=\(ER) len=\(p! - data!) \(CURRENT_STATE)")
             }
             return ER
           
@@ -1636,26 +1649,26 @@ public class HTTPParser {
             // this is different to CBDone in that it updates the state
             if debugOn {
               print("  RETURN \(debugChar(ch))" +
-                    " LEN=\(len) len=\(p - data) \(CURRENT_STATE)")
+                    " LEN=\(len) len=\(p! - data!) \(CURRENT_STATE)")
             }
             return RETURN(len)
           
           case .Error(let error):
             if debugOn {
               print("  ERROR \(debugChar(ch)) \(error)" +
-                    " LEN=\(len) len=\(p - data) \(CURRENT_STATE)")
+                    " LEN=\(len) len=\(p! - data!) \(CURRENT_STATE)")
             }
             self.error = error == .OK ? .UNKNOWN : error
-            return RETURN(p - data) // size consumed
+            return RETURN(p! - data!) // size consumed
         }
       } while rc.isReexecute
       
       //if let len = gotoReexecute() { return len } // error?
       
       // FOR LOOP END
-      p += 1
+      p! += 1
     }
-    if debugOn { print("LOOP DONE len=\(p - data) \(CURRENT_STATE)") }
+    if debugOn { print("LOOP DONE len=\(p! - data!) \(CURRENT_STATE)") }
     
     
     /* Run callbacks for any marks that we have leftover after we ran our of
@@ -1725,7 +1738,7 @@ public class HTTPParser {
   
   // MARK: - Implementation
   
-  func STRICT_CHECK(condition: Bool) -> Bool {
+  func STRICT_CHECK(_ condition: Bool) -> Bool {
     // the original has a 'goto error'
     if HTTP_PARSER_STRICT {
       if condition {
@@ -1792,7 +1805,7 @@ public class HTTPParser {
    * than any reasonable request or response so this should never affect
    * day-to-day operation.
    */
-  func COUNT_HEADER_SIZE(V: Int) -> Bool {
+  func COUNT_HEADER_SIZE(_ V: Int) -> Bool {
     self.nread += V
     if self.nread > HTTP_MAX_HEADER_SIZE {
       error = .HEADER_OVERFLOW
@@ -1802,7 +1815,7 @@ public class HTTPParser {
   }
 }
 
-func debugChar(ch: CChar) -> String {
+func debugChar(_ ch: CChar) -> String {
   let p : String
   switch ch {
     case LF:   p = "NL"
@@ -1834,5 +1847,4 @@ private let lCHUNKED           =  7 // strlen(CHUNKED)
 private let lKEEP_ALIVE        = 10 // strlen(KEEP_ALIVE)
 private let lCLOSE             =  5 // strlen(CLOSE)
 
-#endif // Swift 2.2
-
+#endif // Swift 3

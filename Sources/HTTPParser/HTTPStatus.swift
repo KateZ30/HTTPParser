@@ -43,20 +43,18 @@ public enum HTTPStatus : Equatable {
   case Extension(Int, String) // status, statusText
 }
 
-extension HTTPStatus : BooleanType {
-  
-  public var boolValue : Bool {
-    return status >= 200 && status < 300
-  }
-  
+#if swift(>=3.0) // #swift3-fd
+extension HTTPStatus : Boolean {
+  public var boolValue : Bool { return status >= 200 && status < 300 }
 }
+#else
+extension HTTPStatus : BooleanType {
+  public var boolValue : Bool { return status >= 200 && status < 300 }
+}
+#endif
 
 extension HTTPStatus : RawRepresentable {
-  
-  public init?(rawValue: Int) {
-    self.init(rawValue)
-  }
-  
+  public init?(rawValue: Int) { self.init(rawValue) }
   public var rawValue: Int { return self.status }
 }
 
@@ -124,7 +122,7 @@ public extension HTTPStatus {
       // FIXME: complete me
       
       default:
-        let statusText = text ?? HTTPStatus.textForStatus(status)
+        let statusText = text ?? HTTPStatus.text(forStatus: status)
         self = .Extension(status, statusText)
     }
   }
@@ -199,11 +197,11 @@ public extension HTTPStatus {
       case .Extension(_, let text):
         return text
       default:
-        return HTTPStatus.textForStatus(self.status)
+        return HTTPStatus.text(forStatus: self.status)
     }
   }
   
-  public static func textForStatus(status: Int) -> String {
+  public static func text(forStatus status: Int) -> String {
     // FIXME: complete me for type safety ;-)
     
     switch status {

@@ -88,7 +88,7 @@ public struct HTTPParserURL {
       case HTTPParserURLFields.USERINFO: pUserInfo = ptr; lUserInfo = len
       default: fatalError("unexpected URL field")
     }
-    field_set.insert(field)
+    _ = field_set.insert(field)
   }
 }
 
@@ -191,3 +191,8 @@ func parse_url_char(s : ParserState, _ ch : CChar) -> ParserState {
   /* We should never fall out of the switch above unless there's an error */
   return .s_dead;
 }
+#if swift(>=3.0) // #swift3-fd
+func parse_url_char(_ s : ParserState, _ ch : CChar) -> ParserState {
+  return parse_url_char(s: s, ch)
+}
+#endif

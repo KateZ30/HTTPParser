@@ -5,6 +5,7 @@ HTTP Parser
 ![iOS](https://img.shields.io/badge/os-iOS-green.svg?style=flat)
 ![Linux](https://img.shields.io/badge/os-linux-green.svg?style=flat)
 ![MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)
+![Travis](https://api.travis-ci.org/AlwaysRightInstitute/SwiftSockets.svg?branch=develop&style=flat)
 
 This is a parser for HTTP messages written in Swift. It parses both requests and
 responses. The parser is designed to be used in performance HTTP
@@ -38,6 +39,8 @@ parser by Igor Sysoev.
 An attempt was made to keep it close to the original, which results in quite
 ugly Swift, but well. The idea is to make it easier to patch in upstream changes
 to the C parser.
+
+Example usage: [Noze.io](http://noze.io/)
 
 Differences:
 - callbacks are replaced with closures, which are attached to the parser
