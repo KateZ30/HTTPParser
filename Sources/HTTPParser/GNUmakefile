@@ -2,5 +2,5 @@
 
 PACKAGE_DIR=../..
 
-include $(PACKAGE_DIR)/rules.make
+include $(PACKAGE_DIR)/xcconfig/rules.make
 
