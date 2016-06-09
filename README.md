@@ -60,13 +60,15 @@ TODO:
 
 ### Usage
 
-One `HTTPParser` object is used per TCP connection. Initialize the object
+One `http_parser` object is used per TCP connection. Initialize the object
 and set the callbacks. That might look something like this for a request parser:
 ```Swift
-let parser : HTTPParser(.Request)
+let parser : http_parser(.Request)
 parser.data = my_socket
-parser.onURL         { p, data, len in ... }
-parser.onHeaderField { p, data, len in ... }
+
+var settings = http_parser_settings()
+settings.onURL         { p, data, len in ... }
+settings.onHeaderField { p, data, len in ... }
 /* ... */
 ```
 
@@ -87,7 +89,7 @@ if recved < 0 {
 /* Start up / continue the parser.
  * Note we pass recved==0 to signal that EOF has been received.
  */
-nparsed = parser.execute(buf, recved);
+nparsed = parser.execute(settings, buf, recved);
 
 if parser.upgrade {
   /* handle new protocol */
@@ -105,7 +107,7 @@ to receive them.
 
 Scalar valued message information such as `status_code`, `method`, and the
 HTTP version are stored in the parser structure. This data is only
-temporally stored in `HTTPParser` and gets reset on each new message. If
+temporally stored in `http_parser` and gets reset on each new message. If
 this information is needed later, copy it out of the structure during the
 `onHeadersComplete` callback.
 
@@ -152,9 +154,9 @@ save certain data for later usage, you can do that from the callbacks.
 
 There are two types of callbacks:
 
-* notification `typealias http_cb = ( HTTPParser ) -> Int`
+* notification `typealias http_cb = ( http_parser ) -> Int`
     Callbacks: onMessageBegin, onHeadersComplete, onMessageComplete.
-* data `typealias http_data_cb = ( HTTPParser, UnsafePointer<CChar>, size_t) -> Int`
+* data `typealias http_data_cb = ( http_parser, UnsafePointer<CChar>, size_t) -> Int`
     Callbacks: (requests only) onURL,
                (common) onHeaderField, onHeaderValue, onBody
 
@@ -162,7 +164,7 @@ Callbacks must return 0 on success. Returning a non-zero value indicates
 error to the parser, making it exit immediately.
 
 For cases where it is necessary to pass local information to/from a callback,
-the `HTTPParser` object's `data` field can be used.
+the `http_parser` object's `data` field can be used.
 An example of such a case is when using threads to handle a socket connection,
 parse a request, and then give a response over that socket. By instantiation
 of a thread-local struct containing relevant data (e.g. accepted socket,
@@ -191,12 +193,13 @@ func http_parser_thread(sock: socket_t) {
   my_data.sock = sock
 
   /* instantiate a thread-local parser */
-  let parser = HTTPParser(.Request) /* initialise parser */
+  var parser = http_parser(.Request) /* initialise parser */
   /* this custom data reference is accessible through the reference to the
   parser supplied to callback functions */
   parser.data = my_data;
 
-  parser.onURL { parser, at, length in
+  var settings = http_parser_settings()
+  settings.onURL { parser, at, length in
     /* access to thread local custom_data_t struct.
     Use this access save parsed data for later use into thread local
     buffer, or communicate over socket
@@ -207,7 +210,7 @@ func http_parser_thread(sock: socket_t) {
   }
 
   /* execute parser */
-  nparsed = parser.execute(buf, recved);
+  nparsed = parser.execute(settings, buf, recved);
 
   ...
   /* parsed information copied from callback.
