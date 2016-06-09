@@ -2,8 +2,8 @@
 //  HTTPParserTests.swift
 //  HTTPParserTests
 //
-//  Created by Helge Hess on 25/04/16.
-//  Copyright © 2016 Always Right Institute. All rights reserved.
+//  Created by Helge Hess on 30/05/16.
+//  Copyright © 2016 ZeeZide GmbH. All rights reserved.
 //
 
 import XCTest
@@ -11,90 +11,179 @@ import XCTest
 
 class HTTPParserTests: XCTestCase {
   
-  let simpleGetRequest =
-    "GET /index.html HTTP/1.1\r\n" +
-    "Content-length: 0\r\n" +
-    "Content-type: text/plain\r\n" +
-    "\r\n";
-
-  let debugLog = false
+  func testSimpleGETParsing() throws {
+    
+    var parser   = http_parser()
+    var settings = http_parser_settings()
+    
+    settings.onHeaderField { parser, buffer, size in
+      print("Header: \(debugBucketAsString(buffer, size))")
+      return 0
+    }
+    settings.onHeaderValue { parser, buffer, size in
+      print(" Value: \(debugBucketAsString(buffer, size))")
+      return 0
+    }
+    settings.onURL { parser, buffer, size in
+      print("URL:    \(debugBucketAsString(buffer, size))")
+      return 0
+    }
+    settings.onHeadersComplete { parser in
+      print("headers complete!")
+      XCTAssertEqual(parser.nread, 68)
+      //XCTAssertEqual(parser.content_length, 0)
+      XCTAssertEqual(parser.http_major,     1)
+      XCTAssertEqual(parser.http_minor,     1)
+      XCTAssertEqual(parser.status_code,    0)
+      XCTAssertEqual(parser.method, HTTPMethod.GET)
+      XCTAssertEqual(parser.error,  HTTPError.OK)
+      return 0
+    }
+    
+    var didCallComplete = false
+    settings.onMessageComplete { parser in
+      print("message complete!")
+      didCallComplete = true
+      return 0
+    }
+    
+    settings.onBody { _, _, _ in
+      XCTAssertFalse(true) // Called body, not expected
+      return 42
+    }
+    
+    let ( cslen, plen ) = parser.parse(settings: settings,
+                                       string: fixGetRequest)
+    XCTAssertEqual(cslen, plen)
+    
+    XCTAssertTrue(didCallComplete)
+  }
   
-  func testSimpleGetRequest() {
-    let debugLog = self.debugLog // capture
+  func testSimplePOSTParsing() {
     
-    let parser = HTTPParser(type: .Request)
-    XCTAssertNotNil(parser)
+    var parser   = http_parser()
+    var settings = http_parser_settings()
     
-    // NOTE: The approach to collect headers shown here does NOT WORK for
-    //       sources pushing in chunks of data
-    var lastHeaderField : String? = nil
-    var headers = Dictionary<String, String>()
-    
-    parser.onMessageBegin { p in
-      if debugLog { print("*** CB: message begin") }
+    settings.onHeaderField { parser, buffer, size in
+      print("Header: \(debugBucketAsString(buffer, size))")
       return 0
     }
-    parser.onMessageComplete { p in
-      if debugLog { print("*** CB: message DONE") }
+    settings.onHeaderValue { parser, buffer, size in
+      print(" Value: \(debugBucketAsString(buffer, size))")
       return 0
     }
-    parser.onHeadersComplete { p in
-      if debugLog { print("*** CB: headers done: method=\(p.method)") }
-      XCTAssertNotNil(p.method)
-      XCTAssertEqual(p.method, HTTPMethod.GET)
-      XCTAssertEqual(p.http_major!, 1)
-      XCTAssertEqual(p.http_minor!, 1)
+    settings.onURL { parser, buffer, size in
+      print("URL:    \(debugBucketAsString(buffer, size))")
       return 0
     }
-    parser.onHeaderField { p, ptr, len in
-      let s = String.fromCString(ptr, length: len)
-      if debugLog { print("*** CB: header field: \(s)") }
-      lastHeaderField = s
-      return 0
-    }
-    parser.onHeaderValue { p, ptr, len in
-      let s = String.fromCString(ptr, length: len)
-      if debugLog { print("*** CB: header value: \(s)") }
-      XCTAssert(s != nil)
-      XCTAssert(lastHeaderField != nil)
-      headers[lastHeaderField!] = s!
-      return 0
-    }
-    parser.onBody { p, ptr, len in
-      if debugLog { print("*** CB: body") }
-      XCTAssertEqual(0,len) // no body in request
-      return 0
-    }
-    parser.onStatus { p, ptr, len in
-      let s = String.fromCString(ptr, length: len)
-      if debugLog { print("*** CB: status \(s)") }
-      XCTAssert(false) // should not be called on request ...
-      return 0
-    }
-    parser.onURL { p, ptr, len in
-      let s = String.fromCString(ptr, length: len)
-      if debugLog { print("*** CB: url: \(s)") }
-      XCTAssertEqual(s!, "/index.html")
+    settings.onHeadersComplete { parser in
+      print("headers complete!")
+      XCTAssertEqual(parser.nread, 76)
+      XCTAssertEqual(parser.content_length, 49)
+      XCTAssertEqual(parser.http_major,     1)
+      XCTAssertEqual(parser.http_minor,     1)
+      XCTAssertEqual(parser.status_code,    0)
+      XCTAssertEqual(parser.method, HTTPMethod.POST)
+      XCTAssertEqual(parser.error,  HTTPError.OK)
       return 0
     }
     
-    simpleGetRequest.withCString { cstr in
-      let len = size_t(strlen(cstr))
-      let nb  = parser.execute(cstr, len)
-      
-      XCTAssertEqual(len, nb)
+    var didCallComplete = false
+    settings.onMessageComplete { parser in
+      print("message complete!")
+      didCallComplete = true
+      return 0
     }
     
-    // send EOF
-    let nb  = parser.execute(nil, 0)
-    XCTAssertEqual(nb, 0)
+    settings.onBody { parser, buffer, size in
+      print("BODY:   \(debugBucketAsString(buffer, size))")
+      return 0
+    }
     
+    // clen is 49 + hlen = 76 = 125
+    let ( cslen, plen ) = parser.parse(settings: settings,
+                                       string: fixPostRequest)
+    XCTAssertEqual(cslen, plen)
     
-    // finish up
-    if debugLog { print("HEADERS: \(headers)") }
-    XCTAssert(headers.count == 2)
-    XCTAssertEqual(headers["Content-type"],   "text/plain")
-    XCTAssertEqual(headers["Content-length"], "0")
+    XCTAssertTrue(didCallComplete)
+    
+  }
+  
+  
+  let fixGetRequest = makeRequest(method: "GET", "/hello", [
+    "Content-Length" : "0",
+    "Content-Type"   : "text/plain"
+  ])
+  
+  let fixPostRequest = makeRequest(method: "POST", "/login",
+    [
+      "Content-Type"   : "application/json"
+    ],
+    "{ \"login\": \"xyz\", \"password\": \"opq\", \"port\": 80 }"
+  )
+}
+
+
+// MARK: - Helpers
+
+func makeRequest(method m: String, _ url: String,
+                 _ headers: Dictionary<String, String>,
+                 _ body: String? = nil)
+     -> String
+{
+  var s = "\(m) \(url) HTTP/1.1\r\n"
+  for (k, v) in headers {
+    s += "\(k): \(v)\r\n"
+  }
+  
+  if let b = body {
+    s += "Content-length: \(b.utf8.count)\r\n"
+  }
+  
+  s += "\r\n"
+  
+  if let b = body { s += b }
+
+  return s
+}
+
+extension http_parser {
+  
+  mutating func parse(settings set: http_parser_settings, string s: String)
+                -> ( len: Int, parsed: Int )
+  {
+    var cslen = 0, plen = 0
+
+    s.withCString { cs in
+      cslen = Int(strlen(cs))
+      plen = self.execute(set, cs, size_t(cslen))
+    }
+    
+    // EOF
+    let plen2 = self.execute(set, nil, 0)
+    XCTAssertEqual(plen2, 0)
+    
+    return ( cslen, plen )
   }
   
 }
+
+func debugBucketAsString(buf: UnsafePointer<CChar>, _ len: size_t) -> String {
+  var s = ""
+  for i in 0..<len {
+    let c = buf[i]
+    if isprint(Int32(c)) != 0 {
+      s += " \(UnicodeScalar(Int(c)))"
+    }
+    else {
+      s += " \\\(c)"
+    }
+  }
+  return s
+}
+
+#if swift(>=3.0) // #swift3-1st-kwarg
+func debugBucketAsString(_ buf: UnsafePointer<CChar>, _ len: size_t) -> String {
+  return debugBucketAsString(buf: buf, len)
+}
+#endif
