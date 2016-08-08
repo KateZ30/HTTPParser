@@ -1,9 +1,9 @@
 HTTP Parser
 ===========
-![Swift](https://img.shields.io/badge/language-Swift-orange.svg?style=flat)
-![Mac OS X](https://img.shields.io/badge/os-Mac%20OS%20X-green.svg?style=flat)
+![Swift2n3](https://img.shields.io/badge/swift-2+3-blue.svg)
+![Mac OS X](https://img.shields.io/badge/os-macOS-green.svg?style=flat)
 ![iOS](https://img.shields.io/badge/os-iOS-green.svg?style=flat)
-![Linux](https://img.shields.io/badge/os-linux-green.svg?style=flat)
+![Linux](https://img.shields.io/badge/os-tuxOS-green.svg?style=flat)
 ![MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)
 ![Travis](https://api.travis-ci.org/helje5/HTTPParser.svg?branch=develop&style=flat)
 
