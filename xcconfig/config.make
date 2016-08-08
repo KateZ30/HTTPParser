@@ -18,8 +18,9 @@ UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
   # Swift version to use
 
-  SWIFT3_SNAPSHOT= #DEVELOPMENT-SNAPSHOT-2016-05-31-a
-  SWIFT2_SNAPSHOT= #swift-2.2.1-SNAPSHOT-2016-04-23-a
+  # use latest by default
+  #SWIFT3_SNAPSHOT=DEVELOPMENT-SNAPSHOT-2016-05-31-a
+  #SWIFT2_SNAPSHOT=swift-2.2.1-SNAPSHOT-2016-04-23-a
   ifeq ($(swiftv),3)
     SWIFT_SNAPSHOT=$(SWIFT3_SNAPSHOT)
   else
@@ -39,6 +40,10 @@ ifeq ($(UNAME_S),Darwin)
   endif
   ifeq ($(SWIFT_SNAPSHOT),)
     SWIFT_TOOLCHAIN=$(SWIFT_TOOLCHAIN_BASEDIR)/swift-latest.xctoolchain/usr/bin
+    ifeq ("$(wildcard $(SWIFT_TOOLCHAIN))","")
+      SWIFT_TOOLCHAIN=$(shell dirname $(shell xcrun --toolchain swift-latest -f swiftc))
+    endif
+
   endif
 
   # platform settings
@@ -141,4 +146,29 @@ SWIFT_INTERNAL_LINK_FLAGS    += -L$(SWIFT_BUILD_DIR)
 SWIFT_BUILD_TOOL=$(SWIFT_BIN) build $(SWIFT_INTERNAL_BUILD_FLAGS)
 SWIFT_TEST_TOOL =$(SWIFT_BIN) test  $(SWIFT_INTERNAL_TEST_FLAGS)
 SWIFT_CLEAN_TOOL=$(SWIFT_BIN) build --clean
+
+
+NOZE_ALL_MODULES = \
+	http_parser 	\
+	Freddy  	\
+	base64		\
+	mustache	\
+	xsys		\
+	core		\
+	leftpad		\
+	events		\
+	streams		\
+	json		\
+	fs		\
+	dns		\
+	net		\
+	console 	\
+	http		\
+	process 	\
+	child_process	\
+	connect 	\
+	express		\
+	cows		\
+	redis
+
 
