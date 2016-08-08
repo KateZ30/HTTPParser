@@ -208,9 +208,11 @@
 				TargetAttributes = {
 					E80448041CCE4ECD00447204 = {
 						CreatedOnToolsVersion = 7.3;
+						LastSwiftMigration = 0800;
 					};
 					E804480E1CCE4ECD00447204 = {
 						CreatedOnToolsVersion = 7.3;
+						LastSwiftMigration = 0800;
 					};
 				};
 			};
