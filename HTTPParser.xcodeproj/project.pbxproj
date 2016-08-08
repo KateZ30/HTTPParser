@@ -16,6 +16,7 @@
 		E84CEDF51D09B5BE007FA70F /* http_parser.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84CEDF21D09B5BE007FA70F /* http_parser.swift */; };
 		E84CEDF61D09B5BE007FA70F /* http_parser2.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84CEDF31D09B5BE007FA70F /* http_parser2.swift */; };
 		E84CEDF71D09B5BE007FA70F /* http_parser3.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84CEDF41D09B5BE007FA70F /* http_parser3.swift */; };
+		E880A2081D591840000CBE24 /* http_parser_settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E880A2071D591840000CBE24 /* http_parser_settings.swift */; };
 		E8921F891CCEA2B400E8611B /* URLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8921F881CCEA2B400E8611B /* URLParser.swift */; };
 		E8F152DA1D05BBFE009581A7 /* HTTPParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F152D91D05BBFE009581A7 /* HTTPParserTests.swift */; };
 /* End PBXBuildFile section */
@@ -56,6 +57,7 @@
 		E84CEDF21D09B5BE007FA70F /* http_parser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = http_parser.swift; path = Sources/HTTPParser/http_parser.swift; sourceTree = SOURCE_ROOT; };
 		E84CEDF31D09B5BE007FA70F /* http_parser2.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = http_parser2.swift; path = Sources/HTTPParser/http_parser2.swift; sourceTree = SOURCE_ROOT; };
 		E84CEDF41D09B5BE007FA70F /* http_parser3.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = http_parser3.swift; path = Sources/HTTPParser/http_parser3.swift; sourceTree = SOURCE_ROOT; };
+		E880A2071D591840000CBE24 /* http_parser_settings.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = http_parser_settings.swift; path = Sources/HTTPParser/http_parser_settings.swift; sourceTree = SOURCE_ROOT; };
 		E8921F881CCEA2B400E8611B /* URLParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = URLParser.swift; path = Sources/HTTPParser/URLParser.swift; sourceTree = SOURCE_ROOT; };
 		E8F152D91D05BBFE009581A7 /* HTTPParserTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = HTTPParserTests.swift; path = Tests/HTTPParser/HTTPParserTests.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
@@ -105,6 +107,7 @@
 			isa = PBXGroup;
 			children = (
 				E84CEDF21D09B5BE007FA70F /* http_parser.swift */,
+				E880A2071D591840000CBE24 /* http_parser_settings.swift */,
 				E84CEDF31D09B5BE007FA70F /* http_parser2.swift */,
 				E84CEDF41D09B5BE007FA70F /* http_parser3.swift */,
 				E80448491CCFA28D00447204 /* HTTPParserState.swift */,
@@ -205,9 +208,11 @@
 				TargetAttributes = {
 					E80448041CCE4ECD00447204 = {
 						CreatedOnToolsVersion = 7.3;
+						LastSwiftMigration = 0800;
 					};
 					E804480E1CCE4ECD00447204 = {
 						CreatedOnToolsVersion = 7.3;
+						LastSwiftMigration = 0800;
 					};
 				};
 			};
@@ -260,6 +265,7 @@
 				E8921F891CCEA2B400E8611B /* URLParser.swift in Sources */,
 				E80448271CCE4F6500447204 /* HTTPError.swift in Sources */,
 				E80448481CCE5D1500447204 /* ascii.swift in Sources */,
+				E880A2081D591840000CBE24 /* http_parser_settings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

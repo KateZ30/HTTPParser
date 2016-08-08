@@ -43,13 +43,15 @@ to the C parser.
 Example usage: [Noze.io](http://noze.io/).
 
 Differences:
-- callbacks are replaced with closures, which are attached to the parser
-  itself (instead of being passed in as a http_parser_settings)
+- callbacks (`http_parser_settings`) are implemented as a protocol which is
+  passed to the parser
+  - there is a protocol implementation based on closures, but keep in mind that
+    closures are *slow*
 - we use some Swift style enums
 - execute flow is different to the lack of goto's in Swift (uses nested
   functions to share access to some variables)
-- no macros in Swift, hence they are replaced with funcs
-- some (one-time!) allocations are done to get constant C strings
+- no macros in Swift, hence they are replaced with funcs (`@inline(__always)`)
+- some (one-time) allocations are done to get constant C strings
 - can't use bitfields, which makes the parser object a little bigger than the
   C version
 
@@ -66,7 +68,7 @@ and set the callbacks. That might look something like this for a request parser:
 let parser : http_parser(.Request)
 parser.data = my_socket
 
-var settings = http_parser_settings()
+var settings = http_parser_settings_cb() // closure based version
 settings.onURL         { p, data, len in ... }
 settings.onHeaderField { p, data, len in ... }
 /* ... */
@@ -198,7 +200,7 @@ func http_parser_thread(sock: socket_t) {
   parser supplied to callback functions */
   parser.data = my_data;
 
-  var settings = http_parser_settings()
+  var settings = http_parser_settings_cb()
   settings.onURL { parser, at, length in
     /* access to thread local custom_data_t struct.
     Use this access save parsed data for later use into thread local

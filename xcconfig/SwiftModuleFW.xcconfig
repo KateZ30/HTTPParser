@@ -1,4 +1,4 @@
-// share the info.plist
+// Config file for Noze.io modules
 
 DEFINES_MODULE = YES
 
